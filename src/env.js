@@ -12,8 +12,13 @@ export const env = createEnv({
       process.env.NODE_ENV === "production"
         ? z.string()
         : z.string().optional(),
+    AUTH_DISCORD_ID: z.string().min(1),
+    AUTH_DISCORD_SECRET: z.string().min(1),
     DATABASE_URL: z.string().url(),
     SERPER_API_KEY: z.string().min(1),
+    AZURE_RESOURCE_NAME: z.string().min(1),
+    AZURE_API_KEY: z.string().min(1),
+    AZURE_DEPLOYMENT_NAME: z.string().min(1),
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
@@ -33,8 +38,13 @@ export const env = createEnv({
   runtimeEnv: {
     REDIS_URL: process.env.REDIS_URL,
     AUTH_SECRET: process.env.AUTH_SECRET,
+    AUTH_DISCORD_ID: process.env.AUTH_DISCORD_ID,
+    AUTH_DISCORD_SECRET: process.env.AUTH_DISCORD_SECRET,
     DATABASE_URL: process.env.DATABASE_URL,
     SERPER_API_KEY: process.env.SERPER_API_KEY,
+    AZURE_RESOURCE_NAME: process.env.AZURE_RESOURCE_NAME,
+    AZURE_API_KEY: process.env.AZURE_API_KEY,
+    AZURE_DEPLOYMENT_NAME: process.env.AZURE_DEPLOYMENT_NAME,
     NODE_ENV: process.env.NODE_ENV,
   },
   /**
