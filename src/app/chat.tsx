@@ -32,15 +32,10 @@ export const ChatPage = ({ userName, isAuthenticated }: ChatProps) => {
           aria-label="Chat messages"
         >
           {messages.map((message) => {
-            const textContent =
-              message.parts
-                ?.map((part) => (part.type === "text" ? part.text : ""))
-                .join("") || message.role;
-
             return (
               <ChatMessage
                 key={message.id}
-                text={textContent}
+                parts={message.parts ?? []}
                 role={message.role}
                 userName={userName}
               />
