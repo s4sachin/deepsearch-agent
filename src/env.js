@@ -19,6 +19,14 @@ export const env = createEnv({
     AZURE_RESOURCE_NAME: z.string().min(1),
     AZURE_API_KEY: z.string().min(1),
     AZURE_DEPLOYMENT_NAME: z.string().min(1),
+    LANGFUSE_SECRET_KEY: z.string().min(1),
+    LANGFUSE_PUBLIC_KEY: z.string().min(1),
+    LANGFUSE_BASEURL: z.string().url(),
+    SEARCH_RESULTS_COUNT: z.coerce.number().default(10),
+    EVAL_DATASET: z
+      .enum(["dev", "ci", "regression"])
+      .default("dev")
+      .optional(),
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
@@ -45,6 +53,11 @@ export const env = createEnv({
     AZURE_RESOURCE_NAME: process.env.AZURE_RESOURCE_NAME,
     AZURE_API_KEY: process.env.AZURE_API_KEY,
     AZURE_DEPLOYMENT_NAME: process.env.AZURE_DEPLOYMENT_NAME,
+    LANGFUSE_SECRET_KEY: process.env.LANGFUSE_SECRET_KEY,
+    LANGFUSE_PUBLIC_KEY: process.env.LANGFUSE_PUBLIC_KEY,
+    LANGFUSE_BASEURL: process.env.LANGFUSE_BASEURL,
+    SEARCH_RESULTS_COUNT: process.env.SEARCH_RESULTS_COUNT,
+    EVAL_DATASET: process.env.EVAL_DATASET,
     NODE_ENV: process.env.NODE_ENV,
   },
   /**
