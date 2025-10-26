@@ -82,6 +82,7 @@ NextAuth 5.0.0-beta.25 with Discord OAuth provider:
 
 **Schema**: [src/server/db/schema.ts](src/server/db/schema.ts)
 - Auth tables: `users`, `accounts`, `sessions`, `verificationTokens`
+- Rate limiting table: `requests` (tracks API usage per user)
 - All tables prefixed with `ai-app-template_` (see [drizzle.config.ts](drizzle.config.ts))
 - Includes relations for type-safe joins
 
@@ -109,11 +110,23 @@ NextAuth 5.0.0-beta.25 with Discord OAuth provider:
 - Wrapped with Redis caching for cost optimization
 - Type-safe interfaces for all search result types
 
-**Planned Agent Flow**:
-1. Search (Serper API - cached)
-2. Crawl (extract page content)
-3. Synthesize (LLM processing with search context)
-4. Respond (stream to frontend)
+**Chat API & Tool System**: [src/app/api/chat/route.ts](src/app/api/chat/route.ts)
+- Streaming chat endpoint using Vercel AI SDK's `streamText()`
+- 10-step agent loop with `stopWhen(stepCountIs(10))`
+- Single tool: `searchWeb` (Serper API with Redis caching)
+- Returns up to 10 search results (title, link, snippet)
+- System prompt encourages multi-source research with citations
+
+**Agent Flow**:
+1. User sends message → POST /api/chat
+2. LLM decides whether to call `searchWeb` tool
+3. If needed: Search via Serper API (cached 6 hours)
+4. LLM synthesizes results with citations
+5. Stream response to frontend via Server-Sent Events
+
+**Planned Additions**:
+- Crawl (extract page content)
+- Long conversation summarization
 
 ### Environment Variables
 
@@ -161,6 +174,29 @@ When modifying database schema:
 - Fetch data directly in server components using `async` functions
 - Use `auth()` from [src/server/auth/index.ts](src/server/auth/index.ts) to get session in RSC
 
+### Tool Definition Pattern
+
+When adding new tools to the chat API:
+```typescript
+tools: {
+  toolName: tool({
+    description: "Clear description for LLM",
+    inputSchema: z.object({ param: z.string() }),
+    execute: async ({ param }, { abortSignal }) => {
+      // Tool implementation
+      return results;
+    },
+  }),
+}
+```
+
+### Message Streaming Pattern
+
+- Use `streamText()` from AI SDK for streaming responses
+- Client uses `useChat` hook from `@ai-sdk/react`
+- Messages converted via `convertToModelMessages()`
+- Response: `.toUIMessageStreamResponse()` returns Server-Sent Events stream
+
 ### Code Formatting
 
 - Prettier configured with Tailwind plugin ([prettier.config.js](prettier.config.js))
@@ -171,17 +207,19 @@ When modifying database schema:
 
 **Implemented**:
 - Authentication (Discord OAuth)
-- Database schema (Auth tables)
-- Web search integration (Serper API)
-- Redis caching layer
-- Basic UI components
+- Database schema (Auth + requests tables)
+- Web search integration (Serper API with Redis caching)
+- Rate limiting (50 requests/day per user, admin bypass)
+- Chat API with streaming responses
+- Tool calling system (`searchWeb` tool)
+- Tool invocation UI display
+- Message streaming with status indicators
 - LLM configuration (Azure)
+- 10-step agent loop
 
 **In Progress** (see [README.md](README.md)):
 - Chat history persistence
-- Agent loop implementation
 - Content crawling/scraping
-- Rate limiting (IP-based for anonymous users)
 - Conversation summarization for long contexts
 - Chat editing and rerun functionality
 - Follow-up question generation
@@ -190,7 +228,11 @@ When modifying database schema:
 
 - **LLM**: [src/agent.ts](src/agent.ts)
 - **Search**: [src/serper.ts](src/serper.ts)
+- **Chat API**: [src/app/api/chat/route.ts](src/app/api/chat/route.ts)
+- **Chat UI**: [src/app/chat.tsx](src/app/chat.tsx)
+- **Message Components**: [src/components/chat-message.tsx](src/components/chat-message.tsx)
 - **Auth Config**: [src/server/auth/config.ts](src/server/auth/config.ts)
+- **Auth UI**: [src/components/auth-button.tsx](src/components/auth-button.tsx), [src/components/sign-in-modal.tsx](src/components/sign-in-modal.tsx)
 - **Database Schema**: [src/server/db/schema.ts](src/server/db/schema.ts)
 - **Database Client**: [src/server/db/index.ts](src/server/db/index.ts)
 - **Redis Client**: [src/server/redis/redis.ts](src/server/redis/redis.ts)
