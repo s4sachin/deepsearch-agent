@@ -3,20 +3,32 @@ import Link from "next/link";
 import { auth } from "~/server/auth/index.ts";
 import { ChatPage } from "./chat.tsx";
 import { AuthButton } from "../components/auth-button.tsx";
+import { getChats, getChat } from "~/server/db/queries";
 
-const chats = [
-  {
-    id: "1",
-    title: "My First Chat",
-  },
-];
-
-const activeChatId = "1";
-
-export default async function HomePage() {
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ id?: string }>;
+}) {
   const session = await auth();
   const userName = session?.user?.name ?? "Guest";
   const isAuthenticated = !!session?.user;
+  const userId = session?.user?.id;
+  const { id: chatIdFromUrl } = (await searchParams) as  { id?: string };
+
+
+  ///generate a stable chatId if none  exists
+  const chatId = chatIdFromUrl ?? crypto.randomUUID();
+  const isNewChat = !chatIdFromUrl;
+
+  // Fetch chats for sidebar if user is authenticated
+  const chats = isAuthenticated && userId ? await getChats(userId) : [];
+
+  // Fetch chat messages if chatId is provided
+  const currentChat =
+    isAuthenticated && userId && chatId
+      ? await getChat({ userId, chatId })
+      : null;
 
   return (
     <div className="flex h-screen bg-gray-950">
@@ -41,9 +53,9 @@ export default async function HomePage() {
             chats.map((chat) => (
               <div key={chat.id} className="flex items-center gap-2">
                 <Link
-                  href={`/?chatId=${chat.id}`}
+                  href={`/?id=${chat.id}`}
                   className={`flex-1 rounded-lg p-3 text-left text-sm text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-400 ${
-                    chat.id === activeChatId
+                    chat.id === chatId
                       ? "bg-gray-700"
                       : "hover:bg-gray-750 bg-gray-800"
                   }`}
@@ -68,7 +80,14 @@ export default async function HomePage() {
         </div>
       </div>
 
-      <ChatPage userName={userName} isAuthenticated={isAuthenticated} />
+      <ChatPage
+        key={chatId}
+        userName={userName}
+        isAuthenticated={isAuthenticated}
+        chatId={chatId}
+        isNewChat={isNewChat}
+        initialMessages={currentChat?.messages}
+      />
     </div>
   );
 }
