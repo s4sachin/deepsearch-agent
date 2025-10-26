@@ -1,22 +1,31 @@
 import {
   convertToModelMessages,
-  streamText,
-  tool,
-  stepCountIs,
   type UIMessage,
+  createUIMessageStream,
+  createUIMessageStreamResponse,
 } from "ai";
-import { z } from "zod";
 import { and, eq, gte, sql } from "drizzle-orm";
-import { model } from "~/agent";
+import { Langfuse } from "langfuse";
+import { env } from "~/env";
 import { auth } from "~/server/auth";
 import { db } from "~/server/db";
-import { requests, users } from "~/server/db/schema";
-import { searchSerper } from "~/serper";
+import {
+  requests,
+  users,
+  chats,
+  messages as messagesTable,
+} from "~/server/db/schema";
+import { streamFromDeepSearch } from "~/deep-search";
 
 export const maxDuration = 60;
 
+// Initialize Langfuse client
+const langfuse = new Langfuse({
+  environment: env.NODE_ENV,
+});
+  
 // Rate limit configuration
-const RATE_LIMIT_PER_DAY = 10;
+const RATE_LIMIT_PER_DAY = 50;
 
 export async function POST(request: Request) {
   // Check if user is authenticated
@@ -27,9 +36,24 @@ export async function POST(request: Request) {
 
   const userId = session.user.id;
 
+  // Create Langfuse trace for this request
+  const trace = langfuse.trace({
+    name: "chat",
+    userId: userId,
+  });
+
   // Get user details including admin status
+  const getUserSpan = trace.span({
+    name: "get-user",
+    input: { userId },
+  });
+
   const user = await db.query.users.findFirst({
     where: eq(users.id, userId),
+  });
+
+  getUserSpan.end({
+    output: { user: user ? { id: user.id, isAdmin: user.isAdmin } : null },
   });
 
   if (!user) {
@@ -43,6 +67,11 @@ export async function POST(request: Request) {
     startOfToday.setUTCHours(0, 0, 0, 0);
 
     // Count requests made today
+    const checkRateLimitSpan = trace.span({
+      name: "check-rate-limit",
+      input: { userId, startOfToday: startOfToday.toISOString() },
+    });
+
     const requestsToday = await db
       .select({ count: sql<number>`count(*)` })
       .from(requests)
@@ -51,6 +80,10 @@ export async function POST(request: Request) {
       );
 
     const requestCount = Number(requestsToday[0]?.count ?? 0);
+
+    checkRateLimitSpan.end({
+      output: { requestCount, limit: RATE_LIMIT_PER_DAY },
+    });
 
     if (requestCount >= RATE_LIMIT_PER_DAY) {
       return new Response(
@@ -67,51 +100,181 @@ export async function POST(request: Request) {
   }
 
   // Record the request
+  const recordRequestSpan = trace.span({
+    name: "record-request",
+    input: { userId },
+  });
+
   await db.insert(requests).values({
     userId,
   });
 
-  const { messages }: { messages: UIMessage[] } = await request.json();
+  recordRequestSpan.end({
+    output: { success: true },
+  });
 
-  const result = streamText({
-    model,
-    messages: convertToModelMessages(messages),
-    system: `You are a helpful research assistant with access to web search capabilities.
-            Your primary goal is to provide accurate, well-researched answers by searching the web for current information.
+  const { messages, chatId, isNewChat }: { messages: UIMessage[]; chatId?: string; isNewChat?: boolean } =
+    await request.json();
 
-            Guidelines:
-            - ALWAYS use the searchWeb tool to find relevant, up-to-date information before answering questions
-            - Search multiple times if needed to gather comprehensive information
-            - Cite your sources using inline markdown links in your responses
-            - Format citations like this: [source title](URL)
-            - Synthesize information from multiple sources when possible
-            - Be thorough and provide detailed, well-researched answers
-            - If you cannot find relevant information, clearly state that
-            - Remember to use the searchWeb tool whenever you need current information
+  // Create or get chat ID
+  // If this is a new chat, create it before streaming starts
+  // This ensures the chat exists even if the stream fails or is cancelled
+  let currentChatId = chatId;
 
-            Remember: Your strength is in finding and synthesizing current information from the web.`,
-    stopWhen: stepCountIs(10),
-    tools: {
-      searchWeb: tool({
-        description: "Search the web for current information on any topic",
-        inputSchema: z.object({
-          query: z.string().describe("The query to search the web for"),
-        }),
-        execute: async ({ query }, { abortSignal }) => {
-          const results = await searchSerper(
-            { q: query, num: 10 },
-            abortSignal,
-          );
+  if (isNewChat ) {
+    // Extract the first user message to use as title
+    const firstUserMessage = messages.find((msg) => msg.role === "user");
 
-          return results.organic.map((result) => ({
-            title: result.title,
-            link: result.link,
-            snippet: result.snippet,
+    // Get title from the first text part of the message
+    let title = "New Chat";
+    if (firstUserMessage?.parts) {
+      const textPart = firstUserMessage.parts.find((part: any) => part.type === "text");
+      if (textPart && "text" in textPart) {
+        title = textPart.text.slice(0, 100).trim() || "New Chat";
+      }
+    }
+
+    // Create new chat
+    const createChatSpan = trace.span({
+      name: "create-chat",
+      input: { userId, title },
+    });
+
+    const [newChat] = await db
+      .insert(chats)
+      .values({
+        userId,
+        title,
+      })
+      .returning();
+
+    currentChatId = newChat!.id;
+
+    createChatSpan.end({
+      output: { chatId: currentChatId },
+    });
+
+    // Update trace with sessionId now that we have the chatId
+    trace.update({
+      sessionId: currentChatId,
+    });
+
+    // Save the initial user message(s) to the database
+    const messagesToInsert = messages.map((msg, index) => ({
+      chatId: currentChatId!,
+      role: msg.role,
+      parts: msg.parts as unknown[],
+      order: index,
+    }));
+
+    const insertInitialMessagesSpan = trace.span({
+      name: "insert-initial-messages",
+      input: { chatId: currentChatId, messageCount: messagesToInsert.length },
+    });
+
+    await db.insert(messagesTable).values(messagesToInsert);
+
+    insertInitialMessagesSpan.end({
+      output: { success: true, messageCount: messagesToInsert.length },
+    });
+  } else {
+    // Update trace with sessionId for existing chat
+    trace.update({
+      sessionId: currentChatId!,
+    });
+  }
+
+  const stream = createUIMessageStream({
+    originalMessages: messages,
+    execute: async ({ writer }) => {
+      // If this is a new chat, send the chat ID to the frontend
+      if (isNewChat) {
+        writer.write({
+          type: "data-new-chat",
+          id: currentChatId!,
+          data: {
+            type: "NEW_CHAT_CREATED",
+            chatId: currentChatId,
+          },
+        });
+      }
+
+      const result = await streamFromDeepSearch({
+        messages: convertToModelMessages(messages),
+        onFinish: async ({ response }: any) => {
+          console.log("[onFinish] Starting - response.messages count:", response.messages?.length);
+          
+          // Delete all existing messages for this chat
+          const deleteMessagesSpan = trace.span({
+            name: "delete-existing-messages",
+            input: { chatId: currentChatId },
+          });
+
+          await db
+            .delete(messagesTable)
+            .where(eq(messagesTable.chatId, currentChatId!));
+
+          deleteMessagesSpan.end({
+            output: { success: true },
+          });
+
+          // Get all messages including the response
+          const allMessages = response.messages;
+
+          // Save all messages (original + new response) to database
+          // We only need to save the 'parts' property - 'content' is derived from parts
+          const messagesToInsert = allMessages.map((msg: any, index: number) => ({
+            chatId: currentChatId!,
+            role: msg.role,
+            parts: (msg as any).parts as unknown[],
+            order: index,
           }));
+
+          const insertMessagesSpan = trace.span({
+            name: "insert-updated-messages",
+            input: { chatId: currentChatId, messageCount: messagesToInsert.length },
+          });
+
+          await db.insert(messagesTable).values(messagesToInsert);
+          
+          console.log("[onFinish] Saved", messagesToInsert.length, "messages to database");
+
+          insertMessagesSpan.end({
+            output: { success: true, messageCount: messagesToInsert.length },
+          });
+
+          // Update the chat's updatedAt timestamp
+          const updateChatTimestampSpan = trace.span({
+            name: "update-chat-timestamp",
+            input: { chatId: currentChatId },
+          });
+
+          await db
+            .update(chats)
+            .set({
+              updatedAt: new Date(),
+            })
+            .where(eq(chats.id, currentChatId!));
+
+          updateChatTimestampSpan.end({
+            output: { success: true },
+          });
+
+          // Flush Langfuse traces
+          await langfuse.flushAsync();
         },
-      }),
+        telemetry: {
+          isEnabled: true,
+          functionId: "agent",
+          metadata: {
+            langfuseTraceId: trace.id,
+          },
+        },
+      });
+
+      writer.merge(result.toUIMessageStream());
     },
   });
 
-  return result.toUIMessageStreamResponse();
+  return createUIMessageStreamResponse({ stream });
 }
