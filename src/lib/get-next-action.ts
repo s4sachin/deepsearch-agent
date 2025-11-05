@@ -4,6 +4,16 @@ import { model } from "~/agent";
 import { SystemContext } from "./system-context";
 
 export const actionSchema = z.object({
+  title: z
+    .string()
+    .describe(
+      "The title of the action, to be displayed in the UI. Be extremely concise. Examples: 'Searching Rohit Sharma statistics', 'Gathering Black Hole data', 'Analyzing tournament data'",
+    ),
+  reasoning: z
+    .string()
+    .describe(
+      "The reason you chose this step. Explain your thinking process in 1-2 sentences. Why is this action necessary to answer the user's question?",
+    ),
   type: z.enum(["search", "scrape", "answer"]).describe(
     `The type of action to take.
       - 'search': Search the web for more information.
