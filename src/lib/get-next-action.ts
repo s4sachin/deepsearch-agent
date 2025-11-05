@@ -49,6 +49,9 @@ export interface AnswerAction {
 export const getNextAction = async (
   userQuestion: string,
   context: SystemContext,
+  options?: {
+    langfuseTraceId?: string;
+  },
 ): Promise<Action> => {
   // Get current date and time
   const now = new Date();
@@ -70,6 +73,15 @@ export const getNextAction = async (
     model,
     schema: actionSchema,
     system: `You are a research assistant helping to answer a user's question through a systematic process of web search and content scraping. Your goal is to decide the next best action to take in order to gather the necessary information to answer the user's question accurately and thoroughly.`,
+    experimental_telemetry: options?.langfuseTraceId
+      ? {
+          isEnabled: true,
+          functionId: "get-next-action",
+          metadata: {
+            langfuseTraceId: options.langfuseTraceId,
+          },
+        }
+      : undefined,
     prompt: `Here is the context you have to work with:
 CURRENT DATE AND TIME: ${currentDateTime}
 

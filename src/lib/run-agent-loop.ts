@@ -83,7 +83,9 @@ export const runAgentLoop = async (
   // or we've taken 10 actions
   while (!ctx.shouldStop()) {
     // We choose the next action based on the state of our system
-    const nextAction = await getNextAction(userQuestion, ctx);
+    const nextAction = await getNextAction(userQuestion, ctx, {
+      langfuseTraceId: options?.langfuseTraceId,
+    });
 
     // Send the action as a data part for UI display (will be filtered out when persisting)
     if (options?.writeMessagePart) {
