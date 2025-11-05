@@ -58,13 +58,24 @@ const scrapeUrls = async (urls: string[]) => {
  * Run the agent loop to answer a question
  */
 export const runAgentLoop = async (
-  userQuestion: string,
+  messages: import("ai").UIMessage[],
   options?: {
     signal?: AbortSignal;
-    onFinish?: Parameters<typeof streamText>[0]["onFinish"];
-    telemetry?: TelemetrySettings;
+    langfuseTraceId?: string;
+    writeMessagePart?: import("ai").UIMessageStreamWriter<any>["write"];
   },
 ): Promise<StreamTextResult<{}, string>> => {
+  // Extract the user's question from the last message
+  const lastMessage = messages[messages.length - 1];
+  let userQuestion = "Please answer my question";
+
+  if (lastMessage?.role === "user" && lastMessage.parts) {
+    const textPart = lastMessage.parts.find((part: any) => part.type === "text");
+    if (textPart && "text" in textPart) {
+      userQuestion = textPart.text;
+    }
+  }
+
   // A persistent container for the state of our system
   const ctx = new SystemContext();
 
@@ -73,6 +84,14 @@ export const runAgentLoop = async (
   while (!ctx.shouldStop()) {
     // We choose the next action based on the state of our system
     const nextAction = await getNextAction(userQuestion, ctx);
+
+    // Send the action as a data part for UI display (will be filtered out when persisting)
+    if (options?.writeMessagePart) {
+      options.writeMessagePart({
+        type: "data-new-action",
+        data: nextAction,
+      });
+    }
 
     // We execute the action and update the state of our system
     if (nextAction.type === "search") {
@@ -112,8 +131,7 @@ export const runAgentLoop = async (
       }
     } else if (nextAction.type === "answer") {
       return answerQuestion(userQuestion, ctx, {
-        onFinish: options?.onFinish,
-        telemetry: options?.telemetry,
+        langfuseTraceId: options?.langfuseTraceId,
       });
     }
 
@@ -125,7 +143,6 @@ export const runAgentLoop = async (
   // we ask the LLM to give its best attempt at an answer
   return answerQuestion(userQuestion, ctx, {
     isFinal: true,
-    onFinish: options?.onFinish,
-    telemetry: options?.telemetry,
+    langfuseTraceId: options?.langfuseTraceId,
   });
 };
