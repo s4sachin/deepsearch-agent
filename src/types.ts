@@ -11,10 +11,7 @@ type Source = {
 export type OurMessage = UIMessage<
   never,
   {
-    "new-action": {
-      action: string;
-      result?: string;
-    };
+    "new-action": Action;
     sources: Source[];
     usage: {
       totalTokens: number;
