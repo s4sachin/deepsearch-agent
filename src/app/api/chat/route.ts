@@ -9,7 +9,7 @@ import { Langfuse } from "langfuse";
 import { env } from "~/env";
 import { streamFromDeepSearch } from "~/deep-search";
 import type { OurMessage } from "~/types";
-import { messageToString } from "~/utils";
+import { generateChatTitle } from "~/lib/generate-chat-title";
 
 const langfuse = new Langfuse({
   environment: env.NODE_ENV,
@@ -42,8 +42,6 @@ export async function POST(request: Request) {
     await upsertChat({
       userId: session.user.id,
       chatId: newChatId,
-      title:
-        messageToString(messages[messages.length - 1]!).slice(0, 50) + "...",
       messages: messages, // Only save the user's message initially
     });
     currentChatId = newChatId;
@@ -62,6 +60,14 @@ export async function POST(request: Request) {
     name: "chat",
     userId: session.user.id,
   });
+
+  // Start generating title in parallel for new chats
+  let titlePromise: Promise<string> | null = null;
+  if (!chatId) {
+    titlePromise = generateChatTitle(messages, {
+      langfuseTraceId: trace.id,
+    });
+  }
 
   const stream = createUIMessageStream<OurMessage>({
     execute: async ({ writer }) => {
@@ -92,16 +98,17 @@ export async function POST(request: Request) {
       // Merge the existing messages with the response messages
       const entireConversation = [...messages, ...response.messages];
 
-      const lastMessage = entireConversation[entireConversation.length - 1];
-      if (!lastMessage) {
-        return;
+      // Wait for title generation if it's in progress
+      let generatedTitle: string | undefined;
+      if (titlePromise) {
+        generatedTitle = await titlePromise;
       }
 
       // Save the complete chat history
       await upsertChat({
         userId: session.user.id,
         chatId: currentChatId,
-        title: messageToString(lastMessage).slice(0, 50) + "...",
+        title: generatedTitle,
         messages: entireConversation,
       });
 
