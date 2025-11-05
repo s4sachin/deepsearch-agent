@@ -4,6 +4,7 @@ import { auth } from "~/server/auth/index.ts";
 import { ChatPage } from "./chat.tsx";
 import { AuthButton } from "../components/auth-button.tsx";
 import { getChats, getChat } from "~/server/db/queries";
+import type { OurMessage } from "~/types";
 
 export default async function HomePage({
   searchParams,
@@ -13,22 +14,27 @@ export default async function HomePage({
   const session = await auth();
   const userName = session?.user?.name ?? "Guest";
   const isAuthenticated = !!session?.user;
-  const userId = session?.user?.id;
-  const { id: chatIdFromUrl } = (await searchParams) as  { id?: string };
+  const { id: chatId } = await searchParams;
 
+  // Fetch chats if user is authenticated
+  const chats =
+    isAuthenticated && session.user?.id
+      ? await getChats(session.user.id)
+      : [];
 
-  ///generate a stable chatId if none  exists
-  const chatId = chatIdFromUrl ?? crypto.randomUUID();
-  const isNewChat = !chatIdFromUrl;
-
-  // Fetch chats for sidebar if user is authenticated
-  const chats = isAuthenticated && userId ? await getChats(userId) : [];
-
-  // Fetch chat messages if chatId is provided
-  const currentChat =
-    isAuthenticated && userId && chatId
-      ? await getChat({ userId, chatId })
+  // Fetch active chat if chatId is present and user is authenticated
+  const activeChat =
+    chatId && isAuthenticated && session.user?.id
+      ? await getChat({ userId: session.user.id, chatId })
       : null;
+
+  // Map the messages to the correct format for useChat
+  const initialMessages =
+    activeChat?.messages.map((msg) => ({
+      id: msg.id,
+      role: msg.role as "user" | "assistant",
+      parts: msg.parts as OurMessage["parts"],
+    })) ?? [];
 
   return (
     <div className="flex h-screen bg-gray-950">
@@ -81,12 +87,11 @@ export default async function HomePage({
       </div>
 
       <ChatPage
-        key={chatId}
+        key={chatId || "new"}
         userName={userName}
         isAuthenticated={isAuthenticated}
         chatId={chatId}
-        isNewChat={isNewChat}
-        initialMessages={currentChat?.messages}
+        initialMessages={initialMessages}
       />
     </div>
   );
