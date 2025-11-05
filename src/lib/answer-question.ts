@@ -8,7 +8,6 @@ import { SystemContext } from "./system-context";
 import { markdownJoinerTransform } from "./markdown-joiner-transform";
 
 export const answerQuestion = (
-  userQuestion: string,
   context: SystemContext,
   options?: {
     isFinal?: boolean;
@@ -28,6 +27,7 @@ export const answerQuestion = (
     timeZoneName: "short",
   });
 
+  const messageHistory = context.getMessageHistory();
   const queryHistory = context.getQueryHistory();
   const scrapeHistory = context.getScrapeHistory();
 
@@ -62,8 +62,8 @@ IMPORTANT: This is your final attempt to answer the question. You may not have a
 
     CURRENT DATE AND TIME: ${currentDateTime}
 
-    USER'S QUESTION:
-    ${userQuestion}
+    CONVERSATION HISTORY:
+    ${messageHistory}
 
     ## Your Core Identity
 

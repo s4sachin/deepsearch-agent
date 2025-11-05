@@ -65,25 +65,14 @@ export const runAgentLoop = async (
     writeMessagePart?: import("ai").UIMessageStreamWriter<any>["write"];
   },
 ): Promise<StreamTextResult<{}, string>> => {
-  // Extract the user's question from the last message
-  const lastMessage = messages[messages.length - 1];
-  let userQuestion = "Please answer my question";
-
-  if (lastMessage?.role === "user" && lastMessage.parts) {
-    const textPart = lastMessage.parts.find((part: any) => part.type === "text");
-    if (textPart && "text" in textPart) {
-      userQuestion = textPart.text;
-    }
-  }
-
   // A persistent container for the state of our system
-  const ctx = new SystemContext();
+  const ctx = new SystemContext(messages);
 
   // A loop that continues until we have an answer
   // or we've taken 10 actions
   while (!ctx.shouldStop()) {
     // We choose the next action based on the state of our system
-    const nextAction = await getNextAction(userQuestion, ctx, {
+    const nextAction = await getNextAction(ctx, {
       langfuseTraceId: options?.langfuseTraceId,
     });
 
@@ -132,7 +121,7 @@ export const runAgentLoop = async (
         console.error("All scrapes failed:", scrapeResult.error);
       }
     } else if (nextAction.type === "answer") {
-      return answerQuestion(userQuestion, ctx, {
+      return answerQuestion(ctx, {
         langfuseTraceId: options?.langfuseTraceId,
       });
     }
@@ -143,7 +132,7 @@ export const runAgentLoop = async (
 
   // If we've taken 10 actions and still don't have an answer,
   // we ask the LLM to give its best attempt at an answer
-  return answerQuestion(userQuestion, ctx, {
+  return answerQuestion(ctx, {
     isFinal: true,
     langfuseTraceId: options?.langfuseTraceId,
   });

@@ -47,7 +47,6 @@ export interface AnswerAction {
 }
 
 export const getNextAction = async (
-  userQuestion: string,
   context: SystemContext,
   options?: {
     langfuseTraceId?: string;
@@ -66,6 +65,7 @@ export const getNextAction = async (
     timeZoneName: "short",
   });
 
+  const messageHistory = context.getMessageHistory();
   const queryHistory = context.getQueryHistory();
   const scrapeHistory = context.getScrapeHistory();
 
@@ -85,8 +85,8 @@ export const getNextAction = async (
     prompt: `Here is the context you have to work with:
 CURRENT DATE AND TIME: ${currentDateTime}
 
-USER'S QUESTION:
-${userQuestion}
+CONVERSATION HISTORY:
+${messageHistory}
 
 YOUR TASK:
 Decide on the next action to take in order to thoroughly answer the user's question. You can:

@@ -1,3 +1,5 @@
+import type { UIMessage } from "ai";
+
 type QueryResultSearchResult = {
   date: string;
   title: string;
@@ -25,6 +27,11 @@ export class SystemContext {
   private step = 0;
 
   /**
+   * The conversation message history
+   */
+  private messages: UIMessage[] = [];
+
+  /**
    * The history of all queries searched
    */
   private queryHistory: QueryResult[] = [];
@@ -33,6 +40,10 @@ export class SystemContext {
    * The history of all URLs scraped
    */
   private scrapeHistory: ScrapeResult[] = [];
+
+  constructor(messages: UIMessage[]) {
+    this.messages = messages;
+  }
 
   shouldStop() {
     return this.step >= 10;
@@ -70,6 +81,21 @@ export class SystemContext {
           `</scrape_result>`,
         ].join("\n\n"),
       )
+      .join("\n\n");
+  }
+
+  getMessageHistory(): string {
+    return this.messages
+      .map((message) => {
+        const role = message.role.toUpperCase();
+        // Extract text content from parts
+        const textParts = message.parts
+          ?.filter((part) => part.type === "text")
+          .map((part) => ("text" in part ? part.text : ""))
+          .join("\n");
+        const content = textParts || "";
+        return `<message role="${role}">\n${content}\n</message>`;
+      })
       .join("\n\n");
   }
 }
