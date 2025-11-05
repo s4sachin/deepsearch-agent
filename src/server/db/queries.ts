@@ -12,7 +12,7 @@ import type { UIMessage } from "ai";
 export const upsertChat = async (opts: {
   userId: string;
   chatId: string;
-  title: string;
+  title?: string;
   messages: UIMessage[];
 }) => {
   const { userId, chatId, title, messages: newMessages } = opts;
@@ -35,23 +35,24 @@ export const upsertChat = async (opts: {
   // Use a transaction to ensure atomicity
   await db.transaction(async (tx) => {
     if (existingChat) {
-      // Update existing chat's updatedAt timestamp and title
-      await tx
-        .update(chats)
-        .set({
-          title,
-          updatedAt: new Date(),
-        })
-        .where(eq(chats.id, chatId));
+      // Update existing chat's updatedAt timestamp and optionally title
+      const updateData: { updatedAt: Date; title?: string } = {
+        updatedAt: new Date(),
+      };
+      if (title !== undefined) {
+        updateData.title = title;
+      }
+      await tx.update(chats).set(updateData).where(eq(chats.id, chatId));
 
       // Delete all existing messages (cascade should handle this, but being explicit)
       await tx.delete(messages).where(eq(messages.chatId, chatId));
     } else {
-      // Create new chat
+      // Create new chat with default title if not provided
+      const finalTitle = title ?? "New Chat";
       await tx.insert(chats).values({
         id: chatId,
         userId,
-        title,
+        title: finalTitle,
       });
     }
 
