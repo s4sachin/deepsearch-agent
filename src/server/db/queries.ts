@@ -1,13 +1,7 @@
 import { db } from ".";
 import { chats, messages } from "./schema";
 import { eq, desc, and } from "drizzle-orm";
-
-// Type for messages that matches the structure we're storing
-export type StoredMessage = {
-  id: string;
-  role: string;
-  parts?: unknown[];
-};
+import type { UIMessage } from "ai";
 
 /**
  * Upsert a chat with all its messages.
@@ -19,7 +13,7 @@ export const upsertChat = async (opts: {
   userId: string;
   chatId: string;
   title: string;
-  messages: StoredMessage[];
+  messages: UIMessage[];
 }) => {
   const { userId, chatId, title, messages: newMessages } = opts;
 
