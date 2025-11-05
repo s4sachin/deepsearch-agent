@@ -1,89 +1,94 @@
 "use client";
 
-import { useChat, type UIMessage } from "@ai-sdk/react";
-import { is } from "drizzle-orm";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
-import { StickToBottom } from "use-stick-to-bottom";
+import { useState, useRef } from "react";
 import { ChatMessage } from "~/components/chat-message";
 import { SignInModal } from "~/components/sign-in-modal";
-import { isNewChatCreated } from "~/lib/chat-utils";
+import type { OurMessage } from "~/types";
+import { StickToBottom } from "use-stick-to-bottom";
+
 
 interface ChatProps {
   userName: string;
   isAuthenticated: boolean;
-  chatId: string ;
-  isNewChat: boolean;
-  initialMessages?: Array<{
-    id: string;
-    role: string;
-    parts: unknown[];
-    order: number;
-  }>;
+  chatId: string | undefined;
+  initialMessages: OurMessage[];
 }
 
 export const ChatPage = ({
   userName,
   isAuthenticated,
   chatId,
-  isNewChat,
   initialMessages,
 }: ChatProps) => {
-  const [input, setInput] = useState("");
   const [showSignInModal, setShowSignInModal] = useState(false);
   const router = useRouter();
-  const hasRedirectedRef = useRef(false);
+  const newChatIdRef = useRef<string | null>(null);
 
-  const { messages, sendMessage, status } = useChat({
-    id: chatId, // This is the key - it resets the hook when chatId changes
-    messages: initialMessages?.map((msg) => ({
-      id: msg.id,
-      role: msg.role as "user" | "assistant",
-      parts: msg.parts as UIMessage["parts"],
-      // content is automatically derived from parts in AI SDK v5
-    })),
-    onError: (error) => {
-      // If we get a 401 error, show the sign-in modal
-      if (error.message.includes("401")) {
-        setShowSignInModal(true);
+  const { messages, status, sendMessage } = useChat<OurMessage>({
+    transport: new DefaultChatTransport({
+      body: {
+        chatId,
+      },
+    }),
+    messages: initialMessages,
+    onData: (dataPart) => {
+      if (dataPart.type === "data-new-chat-created") {
+        // Store the new chat ID but don't redirect yet (would cause remount during streaming)
+        newChatIdRef.current = dataPart.data.chatId;
+      }
+    },
+    onFinish: () => {
+      // After streaming completes, update the URL if we created a new chat
+      if (newChatIdRef.current) {
+        router.replace(`?id=${newChatIdRef.current}`, { scroll: false });
+        newChatIdRef.current = null;
       }
     },
   });
 
-  // Listen for NEW_CHAT_CREATED event in message parts and redirect
-  // Reset redirect flag when the chatId changes (navigated to a different chat)
-  useEffect(() => {
-    hasRedirectedRef.current = false;
-  }, [chatId]);
+  const [input, setInput] = useState("");
 
-  useEffect(() => {
-    // Only redirect after streaming is complete
-    if (hasRedirectedRef.current || status === "streaming") return;
-    
-    // Check the last message for data-new-chat parts
-    if (messages.length > 0) {
-      const lastMessage = messages[messages.length - 1];
-      const newChatDataPart = lastMessage?.parts?.find(
-        (part: any) => part.type === "data-new-chat",
-      );
+  const isLoading = status === "streaming";
 
-      if (newChatDataPart && "data" in newChatDataPart) {
-        const data = newChatDataPart.data;
-        if (isNewChatCreated(data) && data.chatId !== chatId) {
-          // Only redirect if we're not already on this chat ID
-          hasRedirectedRef.current = true;
-          router.push(`?id=${data.chatId}`);
-        }
-      }
+  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    if (!isAuthenticated) {
+      setShowSignInModal(true);
+      return;
     }
-  }, [messages, router, chatId, status]);
+
+    sendMessage({
+      text: input,
+    });
+    setInput("");
+  };
 
   return (
     <>
       <div className="flex flex-1 flex-col">
+        {/* <div
+          className="mx-auto w-full max-w-[65ch] flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-track-gray-800 scrollbar-thumb-gray-600 hover:scrollbar-thumb-gray-500"
+          role="log"
+          aria-label="Chat messages"
+        >
+          {messages.map((message, index) => {
+            return (
+              <ChatMessage
+                key={index}
+                parts={message.parts ?? []}
+                role={message.role}
+                userName={userName}
+              />
+            );
+          })}
+        </div> */}
         <StickToBottom
-          className="mx-auto w-full max-w-[65ch] flex-1 overflow-auto [&>div]:p-4 [&>div]:scrollbar-thin [&>div]:scrollbar-track-gray-800 [&>div]:scrollbar-thumb-gray-600 hover:[&>div]:scrollbar-thumb-gray-500"
+          className="flex-1 mx-auto w-full max-w-[65ch] overflow-y-auto [&>div]:p-4 [&>div]:scrollbar-thin [&>div]:scrollbar-track-gray-800 [&>div]:scrollbar-thumb-gray-600 hover:[&>div]:scrollbar-thumb-gray-500"
           resize="smooth"
           initial="smooth"
         >
@@ -92,48 +97,21 @@ export const ChatPage = ({
             role="log"
             aria-label="Chat messages"
           >
-            {messages.map((message) => {
+            {messages.map((message, index) => {
               return (
                 <ChatMessage
-                  key={message.id}
+                  key={index}
                   parts={message.parts ?? []}
                   role={message.role}
                   userName={userName}
                 />
               );
             })}
-            {status === "streaming" && (
-              <div className="flex items-center gap-2 text-gray-400">
-                <Loader2 className="size-4 animate-spin" />
-                <span>Thinking...</span>
-              </div>
-            )}
           </StickToBottom.Content>
         </StickToBottom>
 
         <div className="border-t border-gray-700">
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!isAuthenticated) {
-                setShowSignInModal(true);
-                return;
-              }
-              if (input.trim()) {
-                sendMessage(
-                  { text: input },
-                  {
-                    body: {
-                      chatId,
-                      isNewChat,
-                    },
-                  },
-                );
-                setInput("");
-              }
-            }}
-            className="mx-auto max-w-[65ch] p-4"
-          >
+          <form onSubmit={handleSubmit} className="mx-auto max-w-[65ch] p-4">
             <div className="flex gap-2">
               <input
                 value={input}
@@ -141,15 +119,18 @@ export const ChatPage = ({
                 placeholder="Say something..."
                 autoFocus
                 aria-label="Chat input"
-                disabled={status === "streaming"}
                 className="flex-1 rounded border border-gray-700 bg-gray-800 p-2 text-gray-200 placeholder-gray-400 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-50"
               />
               <button
                 type="submit"
-                disabled={status === "streaming"}
+                disabled={isLoading}
                 className="rounded bg-gray-700 px-4 py-2 text-white hover:bg-gray-600 focus:border-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-400 disabled:opacity-50 disabled:hover:bg-gray-700"
               >
-                Send
+                {isLoading ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  "Send"
+                )}
               </button>
             </div>
           </form>
