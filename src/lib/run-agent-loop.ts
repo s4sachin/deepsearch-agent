@@ -7,6 +7,7 @@ import { SystemContext } from "./system-context";
 import { getNextAction } from "./get-next-action";
 import { answerQuestion } from "./answer-question";
 import { checkIsSafe } from "./check-is-safe";
+import { checkIfQuestionNeedsClarification } from "./check-if-question-needs-clarification";
 import { model } from "~/agent";
 
 /**
@@ -80,6 +81,38 @@ export const runAgentLoop = async (
     return streamText({
       model,
       prompt: `The user's request has been classified as unsafe. Politely explain that you cannot help with this request.${safetyCheck.reason ? ` Reason: ${safetyCheck.reason}` : ""}`,
+    });
+  }
+
+  // Check if the question needs clarification
+  const clarificationResult = await checkIfQuestionNeedsClarification(ctx, {
+    langfuseTraceId: options?.langfuseTraceId,
+  });
+
+  if (clarificationResult.needsClarification) {
+    // Return a stream with the clarification request
+    return streamText({
+      model,
+      system: `You are a clarification agent.
+Your job is to ask the user for clarification on their question.`,
+      prompt: `Here is the message history:
+
+${ctx.getMessageHistory()}
+
+And here is why the question needs clarification:
+
+${clarificationResult.reason}
+
+Please reply to the user with a clarification request.`,
+      experimental_telemetry: options?.langfuseTraceId
+        ? {
+            isEnabled: true,
+            functionId: "clarification-request",
+            metadata: {
+              langfuseTraceId: options.langfuseTraceId,
+            },
+          }
+        : undefined,
     });
   }
 
