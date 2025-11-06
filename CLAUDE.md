@@ -14,9 +14,14 @@ pnpm install                    # Install dependencies (use pnpm, not npm)
 ```
 
 ### Database Setup
-The project requires PostgreSQL and Redis. Use Docker Desktop and run:
+The project uses Supabase (cloud PostgreSQL) and Redis.
+
+**Supabase**: Already configured and running at https://uhspzspuudhizkpfwjbp.supabase.co
+- No local PostgreSQL needed
+- Update `DATABASE_URL` in `.env` with your Supabase connection string
+
+**Redis**: Use Docker Desktop and run:
 ```bash
-./start-database.sh             # Start PostgreSQL container
 ./start-redis.sh                # Start Redis container
 ```
 

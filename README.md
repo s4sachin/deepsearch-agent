@@ -132,7 +132,8 @@ All tables prefixed with `ai-app-template_` for multi-project support.
 ### Prerequisites
 
 - Node.js 22+ with pnpm
-- Docker Desktop (for PostgreSQL and Redis)
+- Docker Desktop (for Redis only - PostgreSQL is on Supabase)
+- Supabase account and project
 - Azure OpenAI API access
 - Serper API key
 - Discord OAuth application
@@ -148,8 +149,8 @@ All tables prefixed with `ai-app-template_` for multi-project support.
 
 2. **Start infrastructure services**
    ```bash
-   ./start-database.sh  # PostgreSQL on port 5432
    ./start-redis.sh     # Redis on port 6379
+   # PostgreSQL is hosted on Supabase - no local setup needed
    ```
 
 3. **Configure environment variables**
@@ -161,8 +162,11 @@ All tables prefixed with `ai-app-template_` for multi-project support.
    AZURE_API_KEY=your-api-key
    AZURE_DEPLOYMENT_NAME=your-deployment-name
 
-   # Database
-   DATABASE_URL=postgresql://postgres:password@localhost:5432/ai-app
+   # Database - Supabase PostgreSQL (get from Supabase dashboard)
+   # Use direct connection for migrations:
+   DATABASE_URL=postgresql://postgres:[PASSWORD]@uhspzspuudhizkpfwjbp.supabase.com:5432/postgres
+   # Or transaction pooler for production:
+   # DATABASE_URL=postgresql://postgres:[PASSWORD]@uhspzspuudhizkpfwjbp.pooler.supabase.com:6543/postgres?pgbouncer=true
 
    # Redis
    REDIS_URL=redis://localhost:6379
@@ -179,10 +183,9 @@ All tables prefixed with `ai-app-template_` for multi-project support.
    NODE_ENV=development
    ```
 
-4. **Initialize database**
-   ```bash
-   pnpm db:push  # Push schema to database
-   ```
+4. **Database is already set up**
+
+   The Supabase database schema is already deployed and ready to use. No additional setup needed!
 
 5. **Start development server**
    ```bash
