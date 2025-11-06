@@ -18,11 +18,12 @@ const langfuse = new Langfuse({
 export const maxDuration = 60;
 
 export async function POST(request: Request) {
-  const session = await auth();
-
-  if (!session) {
-    return new Response("Unauthorized", { status: 401 });
-  }
+  // TEMPORARY: Authentication disabled - using anonymous user
+  // const session = await auth();
+  // if (!session) {
+  //   return new Response("Unauthorized", { status: 401 });
+  // }
+  const session = { user: { id: "anonymous-user", name: "Anonymous" } };
 
   const body = (await request.json()) as {
     messages: Array<UIMessage>;
@@ -46,13 +47,13 @@ export async function POST(request: Request) {
     });
     currentChatId = newChatId;
   } else {
-    // Verify the chat belongs to the user
-    const chat = await db.query.chats.findFirst({
-      where: eq(chats.id, currentChatId),
-    });
-    if (!chat || chat.userId !== session.user.id) {
-      return new Response("Chat not found or unauthorized", { status: 404 });
-    }
+    // TEMPORARY: Chat ownership verification disabled
+    // const chat = await db.query.chats.findFirst({
+    //   where: eq(chats.id, currentChatId),
+    // });
+    // if (!chat || chat.userId !== session.user.id) {
+    //   return new Response("Chat not found or unauthorized", { status: 404 });
+    // }
   }
 
   const trace = langfuse.trace({

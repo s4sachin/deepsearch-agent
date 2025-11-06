@@ -11,22 +11,20 @@ export default async function HomePage({
 }: {
   searchParams: Promise<{ id?: string }>;
 }) {
-  const session = await auth();
+  // TEMPORARY: Authentication disabled - using anonymous user
+  // const session = await auth();
+  const session = { user: { id: "anonymous-user", name: "Anonymous", image: null } };
   const userName = session?.user?.name ?? "Guest";
-  const isAuthenticated = !!session?.user;
+  const isAuthenticated = true; // Always authenticated with anonymous user
   const { id: chatId } = await searchParams;
 
-  // Fetch chats if user is authenticated
-  const chats =
-    isAuthenticated && session.user?.id
-      ? await getChats(session.user.id)
-      : [];
+  // Fetch chats for anonymous user
+  const chats = await getChats(session.user.id);
 
-  // Fetch active chat if chatId is present and user is authenticated
-  const activeChat =
-    chatId && isAuthenticated && session.user?.id
-      ? await getChat({ userId: session.user.id, chatId })
-      : null;
+  // Fetch active chat if chatId is present
+  const activeChat = chatId
+    ? await getChat({ userId: session.user.id, chatId })
+    : null;
 
   // Map the messages to the correct format for useChat
   const initialMessages =
@@ -43,15 +41,13 @@ export default async function HomePage({
         <div className="p-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-gray-400">Your Chats</h2>
-            {isAuthenticated && (
-              <Link
-                href="/"
-                className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                title="New Chat"
-              >
-                <PlusIcon className="h-5 w-5" />
-              </Link>
-            )}
+            <Link
+              href="/"
+              className="flex h-8 w-8 items-center justify-center rounded-lg bg-gray-800 text-gray-300 hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              title="New Chat"
+            >
+              <PlusIcon className="h-5 w-5" />
+            </Link>
           </div>
         </div>
         <div className="-mt-1 flex-1 space-y-2 overflow-y-auto px-4 pt-1 scrollbar-thin scrollbar-track-gray-800 scrollbar-thumb-gray-600">
@@ -72,9 +68,7 @@ export default async function HomePage({
             ))
           ) : (
             <p className="text-sm text-gray-500">
-              {isAuthenticated
-                ? "No chats yet. Start a new conversation!"
-                : "Sign in to start chatting"}
+              No chats yet. Start a new conversation!
             </p>
           )}
         </div>

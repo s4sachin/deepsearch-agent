@@ -57,10 +57,11 @@ export const ChatPage = ({
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
-    if (!isAuthenticated) {
-      setShowSignInModal(true);
-      return;
-    }
+    // TEMPORARY: Authentication check disabled
+    // if (!isAuthenticated) {
+    //   setShowSignInModal(true);
+    //   return;
+    // }
 
     sendMessage({
       text: input,
