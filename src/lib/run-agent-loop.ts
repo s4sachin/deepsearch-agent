@@ -1,4 +1,4 @@
-import type { StreamTextResult, TelemetrySettings } from "ai";
+import type { StreamTextResult } from "ai";
 import { streamText } from "ai";
 import { env } from "~/env";
 import { searchSerper } from "~/serper";
@@ -6,6 +6,8 @@ import { bulkCrawlWebsites } from "~/crawl";
 import { SystemContext } from "./system-context";
 import { getNextAction } from "./get-next-action";
 import { answerQuestion } from "./answer-question";
+import { checkIsSafe } from "./check-is-safe";
+import { model } from "~/agent";
 
 /**
  * Search the web for information
@@ -67,6 +69,19 @@ export const runAgentLoop = async (
 ): Promise<StreamTextResult<{}, string>> => {
   // A persistent container for the state of our system
   const ctx = new SystemContext(messages);
+
+  // Check if the request is safe to process
+  const safetyCheck = await checkIsSafe(ctx, {
+    langfuseTraceId: options?.langfuseTraceId,
+  });
+
+  if (safetyCheck.classification === "refuse") {
+    // Return a stream with the refusal message
+    return streamText({
+      model,
+      prompt: `The user's request has been classified as unsafe. Politely explain that you cannot help with this request.${safetyCheck.reason ? ` Reason: ${safetyCheck.reason}` : ""}`,
+    });
+  }
 
   // A loop that continues until we have an answer
   // or we've taken 10 actions
