@@ -10,7 +10,7 @@ Deep-Search-Agent is an AI-powered conversational search platform built with Nex
 
 ### Setup and Dependencies
 ```bash
-pnpm install                    # Install dependencies (use pnpm, not npm)
+bun install                    # Install dependencies (use bun, not npm)
 ```
 
 ### Database Setup
@@ -27,28 +27,28 @@ The project uses Supabase (cloud PostgreSQL) and Redis.
 
 ### Database Management
 ```bash
-pnpm db:generate                # Generate Drizzle migrations from schema
-pnpm db:migrate                 # Run migrations
-pnpm db:push                    # Push schema changes directly (dev only)
-pnpm db:studio                  # Open Drizzle Studio GUI
+bun db:generate                # Generate Drizzle migrations from schema
+bun db:migrate                 # Run migrations
+bun db:push                    # Push schema changes directly (dev only)
+bun db:studio                  # Open Drizzle Studio GUI
 ```
 
 ### Development
 ```bash
-pnpm dev                        # Start dev server with Turbopack
-pnpm build                      # Production build
-pnpm start                      # Start production server
-pnpm preview                    # Build and start production server
+bun dev                        # Start dev server with Turbopack
+bun build                      # Production build
+bun start                      # Start production server
+bun preview                    # Build and start production server
 ```
 
 ### Code Quality
 ```bash
-pnpm check                      # Run linting + type checking
-pnpm lint                       # Run ESLint
-pnpm lint:fix                   # Auto-fix ESLint issues
-pnpm typecheck                  # Run TypeScript type checking
-pnpm format:check               # Check Prettier formatting
-pnpm format:write               # Auto-format with Prettier
+bun check                      # Run linting + type checking
+bun lint                       # Run ESLint
+bun lint:fix                   # Auto-fix ESLint issues
+bun typecheck                  # Run TypeScript type checking
+bun format:check               # Check Prettier formatting
+bun format:write               # Auto-format with Prettier
 ```
 
 ### Testing
@@ -168,8 +168,8 @@ import { db } from "~/server/db";
 
 When modifying database schema:
 1. Edit [src/server/db/schema.ts](src/server/db/schema.ts)
-2. Run `pnpm db:generate` to create migration
-3. Run `pnpm db:migrate` to apply migration
+2. Run `bun db:generate` to create migration
+3. Run `bun db:migrate` to apply migration
 4. Drizzle maintains type safety across the stack
 
 ### React Server Components (RSC)

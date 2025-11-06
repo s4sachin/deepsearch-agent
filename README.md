@@ -131,7 +131,7 @@ All tables prefixed with `ai-app-template_` for multi-project support.
 
 ### Prerequisites
 
-- Node.js 22+ with pnpm
+- Node.js 22+ with bun
 - Docker Desktop (for Redis only - PostgreSQL is on Supabase)
 - Supabase account and project
 - Azure OpenAI API access
@@ -144,7 +144,7 @@ All tables prefixed with `ai-app-template_` for multi-project support.
    ```bash
    git clone <repository-url>
    cd deep-search-agent
-   pnpm install
+   bun install
    ```
 
 2. **Start infrastructure services**
@@ -189,7 +189,7 @@ All tables prefixed with `ai-app-template_` for multi-project support.
 
 5. **Start development server**
    ```bash
-   pnpm dev
+   bun dev
    ```
 
    Access at [http://localhost:3000](http://localhost:3000)
@@ -207,28 +207,28 @@ All tables prefixed with `ai-app-template_` for multi-project support.
 
 **Development**:
 ```bash
-pnpm dev           # Start dev server (Turbopack)
-pnpm build         # Production build
-pnpm start         # Start production server
-pnpm preview       # Build + start production
+bun dev           # Start dev server (Turbopack)
+bun build         # Production build
+bun start         # Start production server
+bun preview       # Build + start production
 ```
 
 **Database**:
 ```bash
-pnpm db:generate   # Generate migrations
-pnpm db:migrate    # Run migrations
-pnpm db:push       # Push schema (dev only)
-pnpm db:studio     # Open Drizzle Studio GUI
+bun db:generate   # Generate migrations
+bun db:migrate    # Run migrations
+bun db:push       # Push schema (dev only)
+bun db:studio     # Open Drizzle Studio GUI
 ```
 
 **Code Quality**:
 ```bash
-pnpm check         # Lint + typecheck
-pnpm lint          # ESLint
-pnpm lint:fix      # Auto-fix ESLint
-pnpm typecheck     # TypeScript check
-pnpm format:check  # Prettier check
-pnpm format:write  # Auto-format
+bun check         # Lint + typecheck
+bun lint          # ESLint
+bun lint:fix      # Auto-fix ESLint
+bun typecheck     # TypeScript check
+bun format:check  # Prettier check
+bun format:write  # Auto-format
 ```
 
 **Testing**:
@@ -239,8 +239,8 @@ vitest             # Run tests
 ### Database Schema Changes
 
 1. Edit [src/server/db/schema.ts](src/server/db/schema.ts)
-2. Run `pnpm db:generate` to create migration
-3. Run `pnpm db:migrate` to apply
+2. Run `bun db:generate` to create migration
+3. Run `bun db:migrate` to apply
 4. Types automatically updated via Drizzle
 
 ### Adding New AI Tools
