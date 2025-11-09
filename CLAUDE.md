@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Deep-Search-Agent is an AI-powered conversational search platform built with Next.js 15 that combines web search capabilities (via Serper API) with LLM processing (Azure AI) to provide intelligent, research-backed answers. The application features Discord OAuth authentication, PostgreSQL persistence, and Redis caching.
+Deep-Search-Agent is an AI-powered conversational search platform built with Next.js 15 that combines web search capabilities (via Serper API) with LLM processing (Google Gemini 2.0 Flash) to provide intelligent, research-backed answers. The application features Discord OAuth authentication, Supabase PostgreSQL persistence, and Redis caching, with built-in safety guardrails and question clarification.
 
 ## Development Commands
 
@@ -92,8 +92,9 @@ NextAuth 5.0.0-beta.25 with Discord OAuth provider:
 - Includes relations for type-safe joins
 
 **Connection**: [src/server/db/index.ts](src/server/db/index.ts)
-- PostgreSQL client with connection pooling
+- Supabase PostgreSQL client with connection pooling
 - HMR-optimized caching in development
+- Hosted at https://uhspzspuudhizkpfwjbp.supabase.co
 
 ### Caching Strategy (Redis)
 
@@ -105,9 +106,12 @@ NextAuth 5.0.0-beta.25 with Discord OAuth provider:
 ### AI Agent System
 
 **LLM Setup**: [src/agent.ts](src/agent.ts)
-- Azure AI SDK integration
-- Environment-configured: resource name, API key, deployment name
-- Exports `model` instance ready for use
+- Google Gemini 2.0 Flash integration via AI SDK
+- Multiple model exports for different purposes:
+  - `model` - Main conversational model (gemini-2.0-flash-001)
+  - `guardrailModel` - Safety classification (gemini-2.0-flash-001)
+  - `factualityModel` - Factuality assessment (gemini-2.0-flash-001)
+  - `relevancyModel` - Relevancy evaluation (gemini-2.0-flash-001)
 
 **Web Search**: [src/serper.ts](src/serper.ts)
 - Serper API client for Google search results
@@ -115,23 +119,55 @@ NextAuth 5.0.0-beta.25 with Discord OAuth provider:
 - Wrapped with Redis caching for cost optimization
 - Type-safe interfaces for all search result types
 
-**Chat API & Tool System**: [src/app/api/chat/route.ts](src/app/api/chat/route.ts)
-- Streaming chat endpoint using Vercel AI SDK's `streamText()`
-- 10-step agent loop with `stopWhen(stepCountIs(10))`
-- Single tool: `searchWeb` (Serper API with Redis caching)
-- Returns up to 10 search results (title, link, snippet)
-- System prompt encourages multi-source research with citations
+**Deep Search System**: [src/deep-search.ts](src/deep-search.ts) & [src/lib/run-agent-loop.ts](src/lib/run-agent-loop.ts)
+- Streaming interface using `streamFromDeepSearch()`
+- Agent loop with actions: `search`, `scrape`, `answer`
+- Tools: `searchWeb` (Serper API), `scrapeUrls` (content extraction)
+- Automatic action selection via `getNextAction()`
+- Context management with `SystemContext` class
 
 **Agent Flow**:
 1. User sends message → POST /api/chat
-2. LLM decides whether to call `searchWeb` tool
-3. If needed: Search via Serper API (cached 6 hours)
-4. LLM synthesizes results with citations
-5. Stream response to frontend via Server-Sent Events
+2. Safety check (content moderation)
+3. Clarification check (ambiguity detection)
+4. Agent loop (max 10 steps):
+   - LLM selects next action (search/scrape/answer)
+   - Execute action and update context
+   - Repeat until answer ready or max steps reached
+5. Generate final answer with citations
+6. Stream response to frontend via Server-Sent Events
+7. Save conversation to database with auto-generated title
 
-**Planned Additions**:
-- Crawl (extract page content)
-- Long conversation summarization
+### Agent Safety & Guardrails
+
+The system implements two critical safety mechanisms that run before the main agent loop:
+
+**Content Safety Classifier**: [src/lib/check-is-safe.ts](src/lib/check-is-safe.ts)
+- Uses `guardrailModel` (Gemini 2.0 Flash) for content moderation
+- Analyzes full conversation history in XML format
+- Classifications: `allow` or `refuse`
+- Detects: illegal activities, harmful content, privacy violations, dangerous information, exploitation
+- Considers conversation context for multi-turn attack detection
+- Blocks edge cases: legitimate research without proper safeguards
+- Returns refusal reason for transparency
+
+**Question Clarification System**: [src/lib/check-if-question-needs-clarification.ts](src/lib/check-if-question-needs-clarification.ts)
+- Uses `model` (Gemini 2.0 Flash) for ambiguity detection
+- Identifies when questions need clarification before search
+- Detects:
+  - Ambiguous premises or scope
+  - Unknown or ambiguous references
+  - Missing critical context
+  - Contradictory information
+  - Multiple possible interpretations
+- Returns clarification prompt to user when needed
+- Conservative approach: only requests clarification when it significantly improves results
+
+**Integration**: [src/lib/run-agent-loop.ts](src/lib/run-agent-loop.ts)
+1. Safety check runs first - refuses unsafe requests immediately
+2. Clarification check runs second - asks for clarification if needed
+3. Only proceeds to agent loop if both checks pass
+4. Each check uses `SystemContext` for conversation history analysis
 
 ### Environment Variables
 
@@ -141,12 +177,17 @@ NextAuth 5.0.0-beta.25 with Discord OAuth provider:
 - Fails fast on missing/invalid configuration
 
 **Required Variables** (see [.env.example](.env.example)):
-- `AZURE_RESOURCE_NAME`, `AZURE_API_KEY`, `AZURE_DEPLOYMENT_NAME` - Azure AI configuration
-- `DATABASE_URL` - PostgreSQL connection string
+- `GOOGLE_GENERATIVE_AI_API_KEY` - Google Gemini API key (used via @ai-sdk/google)
+- `DATABASE_URL` - Supabase PostgreSQL connection string
 - `REDIS_URL` - Redis connection string
 - `SERPER_API_KEY` - Web search API key
 - `AUTH_SECRET` - NextAuth session encryption (generate with `openssl rand -base64 32`)
+- `AUTH_DISCORD_ID`, `AUTH_DISCORD_SECRET` - Discord OAuth credentials
+- `LANGFUSE_SECRET_KEY`, `LANGFUSE_PUBLIC_KEY`, `LANGFUSE_BASEURL` - Observability (Langfuse)
+- `SEARCH_RESULTS_COUNT` - Number of search results per query (default: 10)
 - `NODE_ENV` - Environment mode
+
+**Note**: Azure OpenAI variables are still in env.js for backwards compatibility but not actively used. The system now uses Google Gemini 2.0 Flash exclusively.
 
 ## Important Patterns and Conventions
 
@@ -211,35 +252,60 @@ tools: {
 ## Current Development Status
 
 **Implemented**:
-- Authentication (Discord OAuth)
-- Database schema (Auth + requests tables)
+- Authentication (Discord OAuth, currently disabled for development)
+- Database schema (Auth + requests + chats + messages tables)
 - Web search integration (Serper API with Redis caching)
-- Rate limiting (50 requests/day per user, admin bypass)
+- Content crawling/scraping (bulkCrawlWebsites)
+- Rate limiting (50 requests/day per user, admin bypass - currently disabled)
 - Chat API with streaming responses
-- Tool calling system (`searchWeb` tool)
-- Tool invocation UI display
+- Agent loop system with action selection (search, scrape, answer)
+- Safety guardrails (content moderation)
+- Question clarification system (ambiguity detection)
+- Chat history persistence with auto-generated titles
 - Message streaming with status indicators
-- LLM configuration (Azure)
-- 10-step agent loop
+- LLM configuration (Google Gemini 2.0 Flash)
+- 10-step agent loop with context management
+- Observability (Langfuse integration)
 
 **In Progress** (see [README.md](README.md)):
-- Chat history persistence
-- Content crawling/scraping
-- Conversation summarization for long contexts
+- Chat history UI (sidebar with chat list)
 - Chat editing and rerun functionality
 - Follow-up question generation
+- Long conversation summarization
 
 ## Key File Locations
 
-- **LLM**: [src/agent.ts](src/agent.ts)
-- **Search**: [src/serper.ts](src/serper.ts)
+### Core AI System
+- **LLM Models**: [src/agent.ts](src/agent.ts)
+- **Deep Search**: [src/deep-search.ts](src/deep-search.ts)
+- **Agent Loop**: [src/lib/run-agent-loop.ts](src/lib/run-agent-loop.ts)
+- **System Context**: [src/lib/system-context.ts](src/lib/system-context.ts)
+- **Action Selection**: [src/lib/get-next-action.ts](src/lib/get-next-action.ts)
+- **Answer Generation**: [src/lib/answer-question.ts](src/lib/answer-question.ts)
+
+### Safety & Guardrails
+- **Safety Classifier**: [src/lib/check-is-safe.ts](src/lib/check-is-safe.ts)
+- **Clarification System**: [src/lib/check-if-question-needs-clarification.ts](src/lib/check-if-question-needs-clarification.ts)
+
+### Search & Crawl
+- **Web Search**: [src/serper.ts](src/serper.ts)
+- **Content Crawling**: [src/crawl.ts](src/crawl.ts)
+
+### API & UI
 - **Chat API**: [src/app/api/chat/route.ts](src/app/api/chat/route.ts)
 - **Chat UI**: [src/app/chat.tsx](src/app/chat.tsx)
 - **Message Components**: [src/components/chat-message.tsx](src/components/chat-message.tsx)
+
+### Auth
 - **Auth Config**: [src/server/auth/config.ts](src/server/auth/config.ts)
 - **Auth UI**: [src/components/auth-button.tsx](src/components/auth-button.tsx), [src/components/sign-in-modal.tsx](src/components/sign-in-modal.tsx)
+
+### Database
 - **Database Schema**: [src/server/db/schema.ts](src/server/db/schema.ts)
 - **Database Client**: [src/server/db/index.ts](src/server/db/index.ts)
+- **Database Queries**: [src/server/db/queries.ts](src/server/db/queries.ts)
+- **Drizzle Config**: [drizzle.config.ts](drizzle.config.ts)
+
+### Infrastructure
 - **Redis Client**: [src/server/redis/redis.ts](src/server/redis/redis.ts)
 - **Environment**: [src/env.js](src/env.js)
-- **Drizzle Config**: [drizzle.config.ts](drizzle.config.ts)

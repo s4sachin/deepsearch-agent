@@ -5,10 +5,10 @@ An AI-powered conversational search platform that combines web search capabiliti
 ## Overview
 
 Deep-Search-Agent is built with Next.js 15 and leverages:
-- **Azure AI** for LLM processing
+- **Google Gemini 2.0 Flash** for LLM processing
 - **Serper API** for web search
 - **Discord OAuth** for authentication
-- **PostgreSQL** for data persistence
+- **Supabase PostgreSQL** for data persistence
 - **Redis** for caching search results
 
 The application uses an agentic approach where the LLM autonomously decides when to search the web, synthesizes information from multiple sources, and provides well-cited answers.
@@ -17,25 +17,34 @@ The application uses an agentic approach where the LLM autonomously decides when
 
 ### 🔍 Intelligent Web Search
 - Multi-step research with up to 10 search iterations
-- Automatic web search tool invocation by the LLM
+- Automatic action selection (search, scrape, answer)
+- Content crawling and extraction from search results
 - Redis caching (6-hour TTL) to optimize API costs
 - Inline citations with source links
 
+### 🛡️ Safety & Guardrails
+- Content safety classifier for harmful request detection
+- Question clarification system for ambiguous queries
+- Multi-turn attack detection in conversation history
+- Transparent refusal reasons when requests are blocked
+
 ### 🔐 Authentication & Security
 - Discord OAuth integration via NextAuth 5
-- Session persistence in PostgreSQL
+- Session persistence in Supabase PostgreSQL
 - Rate limiting: 50 requests/day per user (admin bypass available)
 - User-scoped data access controls
+- Currently disabled for development (anonymous mode)
 
 ### 💬 Chat Persistence
-- Full conversation history storage
+- Full conversation history storage with auto-generated titles
 - Message ordering preservation
 - User-specific chat isolation
 - Efficient chat list queries
+- Langfuse observability integration
 
 ### 🎨 Modern UI
 - Real-time message streaming
-- Tool invocation status indicators
+- Action status indicators (search, scrape, answer)
 - Responsive design with Tailwind CSS
 - Loading states and error handling
 
@@ -45,13 +54,16 @@ The application uses an agentic approach where the LLM autonomously decides when
 
 - **Framework**: Next.js 15 (App Router, React Server Components)
 - **Language**: TypeScript (strict mode)
-- **Database**: PostgreSQL with Drizzle ORM
+- **Database**: Supabase PostgreSQL with Drizzle ORM
 - **Caching**: Redis (ioredis)
 - **Auth**: NextAuth 5 (Discord OAuth)
-- **AI**: Vercel AI SDK + Azure OpenAI
+- **AI**: Vercel AI SDK + Google Gemini 2.0 Flash
 - **Search**: Serper API (Google Search)
+- **Crawling**: Cheerio + Turndown (HTML to Markdown)
+- **Observability**: Langfuse
 - **Styling**: Tailwind CSS
 - **Validation**: Zod schemas
+- **Package Manager**: Bun
 
 ### Project Structure
 
@@ -76,8 +88,17 @@ src/
 │   │   └── index.ts                # DB client
 │   └── redis/
 │       └── redis.ts                # Redis client
-├── agent.ts                        # Azure AI model setup
+├── lib/
+│   ├── run-agent-loop.ts           # Main agent orchestration
+│   ├── check-is-safe.ts            # Safety classifier
+│   ├── check-if-question-needs-clarification.ts  # Clarification system
+│   ├── system-context.ts           # Context management
+│   ├── get-next-action.ts          # Action selection
+│   └── answer-question.ts          # Answer generation
+├── agent.ts                        # Google Gemini model setup
+├── deep-search.ts                  # Deep search interface
 ├── serper.ts                       # Web search API client
+├── crawl.ts                        # Content crawling
 └── env.js                          # Environment validation
 ```
 
@@ -99,22 +120,32 @@ All tables prefixed with `ai-app-template_` for multi-project support.
 ### AI Agent Flow
 
 1. **User Input** → Client sends message to `/api/chat`
-2. **Authentication** → Verify user session, check rate limits
-3. **Agent Loop** → LLM with `searchWeb` tool (max 10 steps)
-   - LLM decides autonomously when to search
-   - Searches executed via Serper API (cached in Redis)
-   - Results returned: title, link, snippet
-4. **Synthesis** → LLM combines sources with citations
-5. **Streaming** → Server-Sent Events stream to client
-6. **Persistence** → Conversations saved to PostgreSQL
+2. **Authentication** → Verify user session (currently disabled for development)
+3. **Safety Check** → Content moderation via safety classifier
+4. **Clarification Check** → Detect ambiguous queries requiring clarification
+5. **Agent Loop** → Up to 10 iterations with action selection:
+   - **Search**: Query Serper API (cached in Redis)
+   - **Scrape**: Extract full content from URLs
+   - **Answer**: Generate final response with citations
+6. **Synthesis** → LLM combines sources with citations
+7. **Streaming** → Server-Sent Events stream to client with action indicators
+8. **Persistence** → Conversations saved to Supabase with auto-generated titles
+9. **Observability** → All traces logged to Langfuse
 
 ### Key Components
 
 #### Chat API ([src/app/api/chat/route.ts](src/app/api/chat/route.ts))
-- Streaming endpoint using `streamText()` from Vercel AI SDK
-- Rate limiting with database tracking
-- Tool: `searchWeb` (Serper API wrapper)
-- System prompt optimized for research and citations
+- Streaming endpoint using `streamFromDeepSearch()`
+- Anonymous mode for development (authentication disabled)
+- Chat creation and persistence with auto-generated titles
+- Langfuse tracing for observability
+
+#### Agent Loop ([src/lib/run-agent-loop.ts](src/lib/run-agent-loop.ts))
+- Safety check with `checkIsSafe()` - refuses unsafe requests
+- Clarification check with `checkIfQuestionNeedsClarification()`
+- Action selection via `getNextAction()` (search/scrape/answer)
+- Context management with `SystemContext` class
+- Maximum 10 iterations before forced answer generation
 
 #### Database Queries ([src/server/db/queries.ts](src/server/db/queries.ts))
 - `upsertChat()` - Create/update chat with authorization
@@ -131,12 +162,13 @@ All tables prefixed with `ai-app-template_` for multi-project support.
 
 ### Prerequisites
 
-- Node.js 22+ with bun
+- Node.js 22+ with Bun
 - Docker Desktop (for Redis only - PostgreSQL is on Supabase)
-- Supabase account and project
-- Azure OpenAI API access
+- Supabase account and project (already configured)
+- Google Gemini API key
 - Serper API key
-- Discord OAuth application
+- Discord OAuth application (optional - auth currently disabled)
+- Langfuse account for observability (optional)
 
 ### Installation
 
@@ -157,10 +189,8 @@ All tables prefixed with `ai-app-template_` for multi-project support.
 
    Copy `.env.example` to `.env` and fill in:
    ```bash
-   # Azure AI
-   AZURE_RESOURCE_NAME=your-resource-name
-   AZURE_API_KEY=your-api-key
-   AZURE_DEPLOYMENT_NAME=your-deployment-name
+   # Google Gemini AI
+   GOOGLE_GENERATIVE_AI_API_KEY=your-gemini-api-key
 
    # Database - Supabase PostgreSQL (get from Supabase dashboard)
    # Use direct connection for migrations:
@@ -174,13 +204,24 @@ All tables prefixed with `ai-app-template_` for multi-project support.
    # Serper API
    SERPER_API_KEY=your-serper-key
 
-   # Auth
+   # Auth (currently disabled for development)
    AUTH_SECRET=your-secret  # Generate: openssl rand -base64 32
    AUTH_DISCORD_ID=your-discord-client-id
    AUTH_DISCORD_SECRET=your-discord-client-secret
 
-   # Environment
+   # Observability (optional)
+   LANGFUSE_SECRET_KEY=your-langfuse-secret
+   LANGFUSE_PUBLIC_KEY=your-langfuse-public
+   LANGFUSE_BASEURL=https://cloud.langfuse.com
+
+   # Configuration
+   SEARCH_RESULTS_COUNT=10
    NODE_ENV=development
+
+   # Legacy (not actively used, but required by env validation)
+   AZURE_RESOURCE_NAME=placeholder
+   AZURE_API_KEY=placeholder
+   AZURE_DEPLOYMENT_NAME=placeholder
    ```
 
 4. **Database is already set up**
@@ -265,17 +306,29 @@ tools: {
 
 ### Rate Limiting
 
-Default: 50 requests/day per user (configurable in [src/app/api/chat/route.ts](src/app/api/chat/route.ts))
+Default: 50 requests/day per user (currently disabled for development)
 
 Admin users bypass rate limits. Set `isAdmin = true` in the `users` table.
 
+### Safety & Clarification
+
+Safety classifier runs before every request to detect harmful content. Configure detection rules in [src/lib/check-is-safe.ts](src/lib/check-is-safe.ts).
+
+Clarification system asks for more information on ambiguous queries. Configure thresholds in [src/lib/check-if-question-needs-clarification.ts](src/lib/check-if-question-needs-clarification.ts).
+
 ### Agent Loop
 
-Max 10 search iterations (configurable via `stepCountIs(10)`)
+Max 10 iterations (configurable in [src/lib/system-context.ts](src/lib/system-context.ts))
+
+Actions per iteration: search, scrape, or answer
 
 ### Cache TTL
 
 Redis cache for Serper API: 6 hours (configurable in [src/serper.ts](src/serper.ts))
+
+### Observability
+
+Langfuse integration enabled by default. All LLM calls, searches, and scrapes are traced with metadata.
 
 ## Important Patterns
 
@@ -297,18 +350,25 @@ import { db } from "~/server/db";      // src/server/db/index.ts
 
 ## Roadmap
 
+### Recently Completed
+- [x] Content crawling/scraping from search results
+- [x] Safety guardrails with content moderation
+- [x] Question clarification system
+- [x] Chat history persistence with auto-generated titles
+- [x] Observability with Langfuse
+
 ### In Progress
 - [ ] Chat history UI (sidebar with chat list)
-- [ ] Content crawling/scraping from search results
-- [ ] Long conversation summarization
 - [ ] Edit/rerun chat functionality
 - [ ] Follow-up question suggestions
+- [ ] Long conversation summarization
 
 ### Planned
+- [ ] Re-enable authentication and rate limiting
 - [ ] Anonymous requests (IP-based rate limiting)
 - [ ] Chunking system for crawled content
-- [ ] AI evaluations (evals framework)
-- [ ] Multi-model support
+- [ ] AI evaluations (evalite framework with existing setup)
+- [ ] Multi-model support (already exports multiple models)
 
 ## License
 
