@@ -1,7 +1,8 @@
 import { db } from ".";
-import { chats, messages } from "./schema";
+import { chats, messages, lessons } from "./schema";
 import { eq, desc, and } from "drizzle-orm";
 import type { UIMessage } from "ai";
+import type { LessonContent, LessonStatus } from "~/types/lesson";
 
 /**
  * Upsert a chat with all its messages.
@@ -101,4 +102,97 @@ export const getChats = async (userId: string) => {
   });
 
   return userChats;
+};
+
+// ========== LESSON QUERIES ==========
+
+/**
+ * Create a new lesson in the database with status "generating"
+ */
+export const createLesson = async (opts: {
+  userId: string;
+  outline: string;
+  title: string;
+}) => {
+  const { userId, outline, title } = opts;
+
+  const [lesson] = await db
+    .insert(lessons)
+    .values({
+      userId,
+      outline,
+      title,
+      status: "generating",
+    })
+    .returning();
+
+  return lesson!;
+};
+
+/**
+ * Update a lesson's status and optionally set content, error message, or other fields
+ */
+export const updateLessonStatus = async (opts: {
+  lessonId: string;
+  status: LessonStatus;
+  content?: LessonContent;
+  description?: string;
+  lessonType?: string;
+  researchNotes?: string[];
+  errorMessage?: string;
+}) => {
+  const { lessonId, status, content, description, lessonType, researchNotes, errorMessage } = opts;
+
+  const updateData: {
+    status: LessonStatus;
+    updatedAt: Date;
+    content?: LessonContent;
+    description?: string;
+    lessonType?: string;
+    researchNotes?: string[];
+    errorMessage?: string;
+  } = {
+    status,
+    updatedAt: new Date(),
+  };
+
+  if (content !== undefined) updateData.content = content;
+  if (description !== undefined) updateData.description = description;
+  if (lessonType !== undefined) updateData.lessonType = lessonType;
+  if (researchNotes !== undefined) updateData.researchNotes = researchNotes;
+  if (errorMessage !== undefined) updateData.errorMessage = errorMessage;
+
+  const [lesson] = await db
+    .update(lessons)
+    .set(updateData)
+    .where(eq(lessons.id, lessonId))
+    .returning();
+
+  return lesson!;
+};
+
+/**
+ * Get a lesson by ID with authorization check
+ * Returns null if lesson doesn't exist or doesn't belong to user
+ */
+export const getLesson = async (opts: { lessonId: string; userId: string }) => {
+  const { lessonId, userId } = opts;
+
+  const lesson = await db.query.lessons.findFirst({
+    where: and(eq(lessons.id, lessonId), eq(lessons.userId, userId)),
+  });
+
+  return lesson ?? null;
+};
+
+/**
+ * Get all lessons for a user, ordered by most recently created first
+ */
+export const getUserLessons = async (userId: string) => {
+  const userLessons = await db.query.lessons.findMany({
+    where: eq(lessons.userId, userId),
+    orderBy: [desc(lessons.createdAt)],
+  });
+
+  return userLessons;
 };

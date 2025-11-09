@@ -15,6 +15,13 @@
       "when": 1761413222201,
       "tag": "0001_special_gabe_jones",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1762671684972,
+      "tag": "0002_mysterious_iron_patriot",
+      "breakpoints": true
     }
   ]
 }

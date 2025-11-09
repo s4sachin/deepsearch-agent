@@ -8,11 +8,13 @@ import {
   timestamp,
   varchar,
   json,
+  jsonb,
   boolean,
   serial,
 } from "drizzle-orm/pg-core";
 import { type AdapterAccount } from "next-auth/adapters";
 import type { InferSelectModel, InferInsertModel } from "drizzle-orm";
+import type { LessonContent } from "~/types/lesson";
 
 /**
  * This is an example of how to use the multi-project schema feature of Drizzle ORM. Use the same
@@ -41,6 +43,7 @@ export const usersRelations = relations(users, ({ many }) => ({
   accounts: many(accounts),
   requests: many(requests),
   chats: many(chats),
+  lessons: many(lessons),
 }));
 
 export const accounts = createTable(
@@ -231,6 +234,61 @@ export const streamsRelations = relations(streams, ({ one }) => ({
   chat: one(chats, { fields: [streams.chatId], references: [chats.id] }),
 }));
 
+export const lessons = createTable(
+  "lesson",
+  {
+    id: varchar("id", { length: 255 })
+      .notNull()
+      .primaryKey()
+      .$defaultFn(() => crypto.randomUUID()),
+    userId: varchar("user_id", { length: 255 })
+      .notNull()
+      .references(() => users.id),
+    
+    // Lesson content
+    title: varchar("title", { length: 255 }).notNull(),
+    outline: text("outline").notNull(), // Original user input
+    description: text("description"), // AI-generated description
+    
+    // Generation status
+    status: varchar("status", { length: 50 })
+      .notNull()
+      .default("generating"), // "generating" | "generated" | "failed"
+    
+    // Generated content (structured JSON stored as JSONB)
+    content: jsonb("content").$type<LessonContent>(), // Structured lesson data
+    researchNotes: json("research_notes").$type<string[]>(), // Research context
+    
+    // Metadata
+    lessonType: varchar("lesson_type", { length: 100 }), // "quiz", "tutorial", "flashcard", "visualization", "diagram"
+    errorMessage: text("error_message"), // If generation failed
+    
+    createdAt: timestamp("created_at", {
+      mode: "date",
+      withTimezone: true,
+    })
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+    
+    updatedAt: timestamp("updated_at", {
+      mode: "date",
+      withTimezone: true,
+    })
+      .notNull()
+      .default(sql`CURRENT_TIMESTAMP`),
+  },
+  (lesson) => ({
+    userIdIdx: index("lesson_user_id_idx").on(lesson.userId),
+    statusIdx: index("lesson_status_idx").on(lesson.status),
+    createdAtIdx: index("lesson_created_at_idx").on(lesson.createdAt),
+    lessonTypeIdx: index("lesson_type_idx").on(lesson.lessonType),
+  }),
+);
+
+export const lessonsRelations = relations(lessons, ({ one }) => ({
+  user: one(users, { fields: [lessons.userId], references: [users.id] }),
+}));
+
 export declare namespace DB {
   export type User = InferSelectModel<typeof users>;
   export type NewUser = InferInsertModel<typeof users>;
@@ -257,4 +315,7 @@ export declare namespace DB {
 
   export type Stream = InferSelectModel<typeof streams>;
   export type NewStream = InferInsertModel<typeof streams>;
+
+  export type Lesson = InferSelectModel<typeof lessons>;
+  export type NewLesson = InferInsertModel<typeof lessons>;
 }
