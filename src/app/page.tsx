@@ -72,12 +72,12 @@ export default async function HomePage({
             </p>
           )}
         </div>
-        <div className="p-4">
+        {/* <div className="p-4">
           <AuthButton
             isAuthenticated={isAuthenticated}
             userImage={session?.user?.image}
           />
-        </div>
+        </div> */}
       </div>
 
       <ChatPage
