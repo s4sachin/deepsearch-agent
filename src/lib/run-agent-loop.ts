@@ -85,36 +85,33 @@ export const runAgentLoop = async (
   }
 
   // Check if the question needs clarification
-  const clarificationResult = await checkIfQuestionNeedsClarification(ctx, {
-    langfuseTraceId: options?.langfuseTraceId,
-  });
+  // const clarificationResult = await checkIfQuestionNeedsClarification(ctx, {
+  //   langfuseTraceId: options?.langfuseTraceId,
+  // });
 
-  if (clarificationResult.needsClarification) {
-    // Return a stream with the clarification request
-    return streamText({
-      model,
-      system: `You are a clarification agent.
-Your job is to ask the user for clarification on their question.`,
-      prompt: `Here is the message history:
+  // if (clarificationResult.needsClarification) {
+//     // Return a stream with the clarification request
+//     return streamText({
+//       model,
+//       system: `You are a clarification agent.
+// Your job is to ask the user for clarification on their question.`,
+//       prompt: `Here is the message history:
 
-${ctx.getMessageHistory()}
+//   ${ctx.getMessageHistory()}
 
-And here is why the question needs clarification:
 
-${clarificationResult.reason}
-
-Please reply to the user with a clarification request.`,
-      experimental_telemetry: options?.langfuseTraceId
-        ? {
-            isEnabled: true,
-            functionId: "clarification-request",
-            metadata: {
-              langfuseTraceId: options.langfuseTraceId,
-            },
-          }
-        : undefined,
-    });
-  }
+// Please reply to the user with a clarification request.`,
+//       experimental_telemetry: options?.langfuseTraceId
+//         ? {
+//             isEnabled: true,
+//             functionId: "clarification-request",
+//             metadata: {
+//               langfuseTraceId: options.langfuseTraceId,
+//             },
+//           }
+//         : undefined,
+//     });
+//   }
 
   // A loop that continues until we have an answer
   // or we've taken 10 actions
