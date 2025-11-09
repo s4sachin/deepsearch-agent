@@ -136,7 +136,7 @@ export const ChatMessage = ({ parts, role, userName }: ChatMessageProps) => {
         <p className="mb-2 text-sm font-semibold text-gray-400">
           {isAI ? "AI" : userName}
         </p>
-
+        
         {/* Show reasoning steps for AI messages */}
         {isAI && <ReasoningSteps parts={parts} />}
 

@@ -41,3 +41,4 @@ coverage/
 prompts/
 docs/
 docs/*.md.docs/
+*.md
