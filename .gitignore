@@ -43,3 +43,4 @@ docs/
 docs/*.md.docs/
 *.md
 trace*.json
+.env.neon.backup
