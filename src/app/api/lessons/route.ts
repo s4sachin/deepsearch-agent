@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "~/server/auth";
 import { createLesson, updateLessonStatus } from "~/server/db/queries";
-import { runUnifiedLoop } from "~/lib/unified/run-unified-loop";
-import { AgentContext } from "~/lib/unified/agent-context";
+import { generateLesson } from "~/deep-search";
 import { Langfuse } from "langfuse";
 import { env } from "~/env";
 import type { LessonContent } from "~/types/lesson";
@@ -113,18 +112,9 @@ export async function POST(req: Request) {
 
       // Step 2: Generate lesson content (await completion)
       
-      // Create context in structured mode with initial message
-      const context = new AgentContext({
-        messages: [{
-          id: crypto.randomUUID(),
-          role: 'user',
-          parts: [{ type: 'text', text: outline.trim() }],
-        }],
-        outputMode: 'structured',
-      });
-      
-      // Start generation with onFinish callback - fire and forget
-      runUnifiedLoop(context, {
+      // Use centralized generateLesson function
+      const context = await generateLesson({
+        outline: outline.trim(),
         langfuseTraceId: langfuseTrace.id,
         langfuseTrace: langfuseTrace,
         onProgress: (step: string, details?: string) => {
@@ -137,10 +127,8 @@ export async function POST(req: Request) {
             },
           });
         },
-        onFinish: async (result) => {
+        onFinish: async (content: LessonContent) => {
           try {
-            const content = result as LessonContent;
-            
             // Generate a proper title using AI
             const title = await generateLessonTitle(outline.trim(), {
               langfuseTraceId: langfuseTrace.id,
@@ -153,7 +141,7 @@ export async function POST(req: Request) {
             const searchHistory = context.getSearchHistory();
             if (searchHistory.length > 0) {
               researchNotes.push(`Searched ${searchHistory.length} queries`);
-              searchHistory.forEach((q) => {
+              searchHistory.forEach((q: any) => {
                 researchNotes.push(`- "${q.query}": ${q.results.length} results`);
               });
             }
@@ -198,7 +186,6 @@ export async function POST(req: Request) {
         onError: async (error: Error) => {
           await handleGenerationError(lesson.id, error, outline, langfuseTrace);
         },
-      }).catch(err => {
       });
       
       // Return immediately
