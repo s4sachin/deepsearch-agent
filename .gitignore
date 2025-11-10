@@ -42,3 +42,4 @@ prompts/
 docs/
 docs/*.md.docs/
 *.md
+trace*.json
