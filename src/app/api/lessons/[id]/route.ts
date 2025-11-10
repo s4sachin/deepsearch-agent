@@ -43,7 +43,6 @@ export async function GET(
 
     return NextResponse.json({ lesson }, { status: 200 });
   } catch (error) {
-    console.error("Error in GET /api/lessons/[id]:", error);
 
     return NextResponse.json(
       {

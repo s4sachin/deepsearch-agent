@@ -1,13 +1,62 @@
 import { NextResponse } from "next/server";
 import { auth } from "~/server/auth";
 import { createLesson, updateLessonStatus } from "~/server/db/queries";
-import { runLessonGeneration } from "~/lib/run-lesson-generation";
+import { runUnifiedLoop } from "~/lib/unified/run-unified-loop";
+import { AgentContext } from "~/lib/unified/agent-context";
 import { Langfuse } from "langfuse";
 import { env } from "~/env";
+import type { LessonContent } from "~/types/lesson";
+import { generateLessonTitle } from "~/lib/generate-chat-title";
 
 const langfuse = new Langfuse({
   environment: env.NODE_ENV,
 });
+
+/**
+ * Helper function to handle generation errors
+ */
+async function handleGenerationError(
+  lessonId: string,
+  error: unknown,
+  outline: string,
+  langfuseTrace: any
+) {
+  // Try to generate a title even for failed lessons
+  let title: string;
+  try {
+    title = await generateLessonTitle(outline, {
+      langfuseTraceId: langfuseTrace.id,
+    });
+  } catch {
+    // Fallback if title generation also fails
+    title = `Error: ${outline.slice(0, 50)}...`;
+  }
+  
+  await updateLessonStatus({
+    lessonId,
+    status: 'failed',
+    title,
+    description: error instanceof Error ? error.message : 'Unknown error',
+    lessonType: 'tutorial',
+    content: {
+      type: 'tutorial',
+      data: {
+        sections: [],
+        difficulty: 'beginner',
+      },
+    },
+    researchNotes: [],
+  });
+  
+  langfuseTrace.update({
+    output: {
+      status: 'error',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    },
+  });
+  
+  await langfuse.shutdownAsync();
+}
 
 /**
  * POST /api/lessons
@@ -62,84 +111,133 @@ export async function POST(req: Request) {
         title: "Generating...", // Temporary title
       });
 
-      // Step 2: Run lesson generation
-      const result = await runLessonGeneration(outline, {
+      // Step 2: Generate lesson content (await completion)
+      
+      // Create context in structured mode with initial message
+      const context = new AgentContext({
+        messages: [{
+          id: crypto.randomUUID(),
+          role: 'user',
+          parts: [{ type: 'text', text: outline.trim() }],
+        }],
+        outputMode: 'structured',
+      });
+      
+      // Start generation with onFinish callback - fire and forget
+      runUnifiedLoop(context, {
         langfuseTraceId: langfuseTrace.id,
-        onProgress: (update) => {
-          // Log progress to Langfuse
+        langfuseTrace: langfuseTrace,
+        onProgress: (step: string, details?: string) => {
           langfuseTrace.event({
-            name: update.step,
+            name: step,
             metadata: {
-              message: update.message,
-              ...update.data,
+              details,
+              currentStep: context.getStep(),
+              contentType: context.getContentType(),
             },
           });
         },
-      });
-
-      // Step 3: Update lesson with generated content
-      await updateLessonStatus({
-        lessonId: lesson.id,
-        status: "generated",
-        content: result.content,
-        description: result.description,
-        lessonType: result.lessonType,
-        researchNotes: result.researchNotes,
-      });
-
-      // Update lesson title if generated title is better
-      if (result.title && result.title !== "Generating...") {
-        await updateLessonStatus({
-          lessonId: lesson.id,
-          status: "generated",
-        });
-      }
-
-      // Finalize Langfuse trace
-      langfuseTrace.update({
-        output: {
-          lessonId: lesson.id,
-          lessonType: result.lessonType,
-          title: result.title,
+        onFinish: async (result) => {
+          try {
+            const content = result as LessonContent;
+            
+            // Generate a proper title using AI
+            const title = await generateLessonTitle(outline.trim(), {
+              langfuseTraceId: langfuseTrace.id,
+            });
+            
+            const description = context.getDescription();
+            const lessonType = context.getContentType();
+            
+            const researchNotes: string[] = [];
+            const searchHistory = context.getSearchHistory();
+            if (searchHistory.length > 0) {
+              researchNotes.push(`Searched ${searchHistory.length} queries`);
+              searchHistory.forEach((q) => {
+                researchNotes.push(`- "${q.query}": ${q.results.length} results`);
+              });
+            }
+            
+            const scrapedContent = context.getScrapedContent();
+            if (scrapedContent.length > 0) {
+              researchNotes.push(`\nScraped ${scrapedContent.length} pages`);
+              scrapedContent.forEach((page: { url: string }) => {
+                researchNotes.push(`- ${page.url}`);
+              });
+            }
+            
+            await updateLessonStatus({
+              lessonId: lesson.id,
+              status: 'generated',
+              title,
+              description: description ?? '',
+              lessonType,
+              content,
+              researchNotes,
+            });
+            
+            langfuseTrace.update({
+              output: {
+                status: 'success',
+                lessonId: lesson.id,
+                title,
+                contentType: lessonType,
+                stepsCompleted: context.getStep(),
+              },
+            });
+            
+            await langfuseTrace.score({
+              name: 'lesson-generated',
+              value: 1,
+            });
+            await langfuse.shutdownAsync();
+          } catch (error) {
+            await handleGenerationError(lesson.id, error, outline, langfuseTrace);
+          }
         },
-      });
-
-      return NextResponse.json(
-        {
-          success: true,
-          lesson: {
-            id: lesson.id,
-            title: result.title,
-            description: result.description,
-            lessonType: result.lessonType,
-            status: "generated",
-          },
+        onError: async (error: Error) => {
+          await handleGenerationError(lesson.id, error, outline, langfuseTrace);
         },
-        { status: 201 }
-      );
-    } catch (generationError) {
+      }).catch(err => {
+      });
+      
+      // Return immediately
+      return NextResponse.json({
+        success: true,
+        lesson: {
+          id: lesson.id,
+          status: 'generating',
+          outline: outline.trim(),
+        },
+        langfuseTraceUrl: `https://cloud.langfuse.com/trace/${langfuseTrace.id}`,
+        message: 'Lesson generation started. Check back in a moment.',
+      });
+    } catch (creationError) {
       // Log error to Langfuse
       langfuseTrace.update({
         output: {
-          error: generationError instanceof Error
-            ? generationError.message
-            : String(generationError),
+          error:
+            creationError instanceof Error
+              ? creationError.message
+              : String(creationError),
         },
-      });
-
-      // If lesson was created, mark it as failed
-      // Note: We don't have the lesson ID here if creation failed
-      // This is a best-effort error handling
-
-      throw generationError;
+      });      return NextResponse.json(
+        {
+          success: false,
+          error: "Failed to create lesson",
+          message:
+            creationError instanceof Error
+              ? creationError.message
+              : String(creationError),
+        },
+        { status: 500 }
+      );
     }
   } catch (error) {
-    console.error("Error in POST /api/lessons:", error);
-
     return NextResponse.json(
       {
-        error: "Failed to generate lesson",
-        message: error instanceof Error ? error.message : String(error),
+        success: false,
+        error: "Internal server error",
       },
       { status: 500 }
     );

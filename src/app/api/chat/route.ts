@@ -92,7 +92,6 @@ export async function POST(request: Request) {
       writer.merge(result.toUIMessageStream());
     },
     onError: (e) => {
-      console.error(e);
       return "Oops, an error occurred!";
     },
     onFinish: async (response) => {
