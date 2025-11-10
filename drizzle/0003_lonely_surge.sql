@@ -1,0 +1,1 @@
+ALTER TABLE "ai-app-template_lesson" ADD COLUMN "actions" jsonb;

@@ -1,7 +1,6 @@
 import { createScorer } from "evalite";
 import { generateObject } from "ai";
 import { z } from "zod";
-import { google } from "@ai-sdk/google";
 import { relevancyModel } from "~/agent";
 
 

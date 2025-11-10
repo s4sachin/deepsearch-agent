@@ -6,6 +6,7 @@
       "dependencies": {
         "@ai-sdk/azure": "^2.0.53",
         "@ai-sdk/google": "^2.0.23",
+        "@ai-sdk/perplexity": "^2.0.17",
         "@ai-sdk/react": "^2.0.72",
         "@auth/drizzle-adapter": "^1.7.2",
         "@opentelemetry/api-logs": "^0.206.0",
@@ -72,6 +73,8 @@
     "@ai-sdk/google": ["@ai-sdk/google@2.0.28", "", { "dependencies": { "@ai-sdk/provider": "2.0.0", "@ai-sdk/provider-utils": "3.0.16" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-JMP2zm5JJcnaaF1jEMabzVIG7jfphzkqJOq+SINAyiDwlpc0BuUL92M/OaYBPob2QBOpnpGH6h/MCok0VR1dSA=="],
 
     "@ai-sdk/openai": ["@ai-sdk/openai@2.0.63", "", { "dependencies": { "@ai-sdk/provider": "2.0.0", "@ai-sdk/provider-utils": "3.0.16" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-J7XJaTOvorCDWxfEmDOPahRyXkt4207OCPp/JcjWYAux/8FCh2xUgjQivrcM4AxHQWYCSOWChGtCw7F5mNmLkA=="],
+
+    "@ai-sdk/perplexity": ["@ai-sdk/perplexity@2.0.17", "", { "dependencies": { "@ai-sdk/provider": "2.0.0", "@ai-sdk/provider-utils": "3.0.16" }, "peerDependencies": { "zod": "^3.25.76 || ^4.1.8" } }, "sha512-FvaUVeEeC81xj0t5JVyA3N3KRWlJJo/dGTaODfIT8TGNqOpE+ub2tAYGLSSUaI2v6jsy90lhnmGRaFh4pusgXA=="],
 
     "@ai-sdk/provider": ["@ai-sdk/provider@2.0.0", "", { "dependencies": { "json-schema": "^0.4.0" } }, "sha512-6o7Y2SeO9vFKB8lArHXehNuusnpddKPk7xqL7T2/b+OvXMRIXUO1rR4wcv1hAFUAT9avGZshty3Wlua/XA7TvA=="],
 
