@@ -1,5 +1,8 @@
 import type { UIMessage } from "ai";
-import type { Action } from "./lib/get-next-action";
+import type { UnifiedAction } from "./lib/unified/unified-actions";
+
+// For backward compatibility
+type Action = UnifiedAction;
 
 type Source = {
   title: string;

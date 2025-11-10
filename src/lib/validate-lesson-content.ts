@@ -9,18 +9,8 @@ import type { LessonContent } from "~/types/lesson";
 const QuizQuestionSchema = z.object({
   id: z.string().min(1, "Question ID is required"),
   question: z.string().min(10, "Question must be at least 10 characters"),
-  options: z.tuple([
-    z.string().min(1),
-    z.string().min(1),
-    z.string().min(1),
-    z.string().min(1),
-  ]).describe("Exactly 4 options required"),
-  correctAnswer: z.union([
-    z.literal(0),
-    z.literal(1),
-    z.literal(2),
-    z.literal(3),
-  ]).describe("Correct answer index (0-3)"),
+  options: z.array(z.string().min(1)).length(4).describe("Exactly 4 options required"),
+  correctAnswer: z.number().int().min(0).max(3).describe("Correct answer index (0-3)"),
   explanation: z.string().optional(),
   points: z.number().positive().optional(),
 });
@@ -28,7 +18,7 @@ const QuizQuestionSchema = z.object({
 /**
  * Quiz Content Schema
  */
-const QuizContentSchema = z.object({
+export const QuizContentSchema = z.object({
   questions: z.array(QuizQuestionSchema).min(1, "At least one question required"),
   totalPoints: z.number().positive().optional(),
   timeLimit: z.number().positive().optional(),
@@ -53,7 +43,7 @@ const TutorialSectionSchema = z.object({
 /**
  * Tutorial Content Schema
  */
-const TutorialContentSchema = z.object({
+export const TutorialContentSchema = z.object({
   sections: z.array(TutorialSectionSchema).min(1, "At least one section required"),
   estimatedReadTime: z.number().positive().optional(),
   difficulty: z.enum(["beginner", "intermediate", "advanced"]).optional(),
@@ -74,7 +64,7 @@ const FlashcardSchema = z.object({
 /**
  * Flashcard Content Schema
  */
-const FlashcardContentSchema = z.object({
+export const FlashcardContentSchema = z.object({
   cards: z.array(FlashcardSchema).min(1, "At least one flashcard required"),
   totalCards: z.number().int().positive(),
   categories: z.array(z.string()).optional(),
@@ -213,7 +203,10 @@ const validateQuizQuality = (
 
   // Check if correct answer is not obviously distinct
   questions.forEach((q) => {
-    const correct = q.options[q.correctAnswer].toLowerCase();
+    const correctOption = q.options[q.correctAnswer];
+    if (!correctOption) return; // Skip if index is out of bounds
+    
+    const correct = correctOption.toLowerCase();
     const otherOptions = q.options
       .filter((_, i) => i !== q.correctAnswer)
       .map((o) => o.toLowerCase());

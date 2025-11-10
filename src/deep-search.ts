@@ -4,7 +4,8 @@ import {
   type StreamTextResult,
   type UIMessageStreamWriter,
 } from "ai";
-import { runAgentLoop } from "~/lib/run-agent-loop";
+import { runUnifiedLoop } from "~/lib/unified/run-unified-loop";
+import { AgentContext } from "~/lib/unified/agent-context";
 import type { OurMessage } from "~/types";
 
 export const streamFromDeepSearch = async (opts: {
@@ -12,10 +13,24 @@ export const streamFromDeepSearch = async (opts: {
   langfuseTraceId?: string;
   writeMessagePart?: UIMessageStreamWriter<OurMessage>["write"];
 }): Promise<StreamTextResult<{}, string>> => {
-  return runAgentLoop(opts.messages, {
+  // Create context in chat mode
+  const context = new AgentContext({
+    messages: opts.messages,
+    outputMode: 'chat',
+  });
+  
+  const result = await runUnifiedLoop(context, {
     langfuseTraceId: opts.langfuseTraceId,
     writeMessagePart: opts.writeMessagePart,
   });
+
+  // In chat mode, runUnifiedLoop always returns StreamTextResult
+  // The type system doesn't know this, so we need to assert
+  if ('toUIMessageStream' in result) {
+    return result as StreamTextResult<{}, string>;
+  }
+  
+  throw new Error('Unexpected result type from chat mode');
 };
 
 export async function askDeepSearch(messages: UIMessage[]) {

@@ -2,8 +2,11 @@
 
 import { useState } from "react";
 import { Search as SearchIcon, Link as LinkIcon } from "lucide-react";
-import type { Action } from "~/lib/get-next-action";
+import type { UnifiedAction } from "~/lib/unified/unified-actions";
 import type { OurMessage } from "~/types";
+
+// Type alias for backward compatibility with existing code
+type Action = UnifiedAction;
 
 interface ReasoningStepsProps {
   parts: OurMessage["parts"];

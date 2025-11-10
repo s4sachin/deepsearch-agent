@@ -8,8 +8,8 @@
 export interface QuizQuestion {
   id: string;
   question: string;
-  options: [string, string, string, string]; // Exactly 4 options
-  correctAnswer: 0 | 1 | 2 | 3; // Index of correct answer
+  options: string[]; // Array of 4 options (validated to be exactly 4)
+  correctAnswer: number; // Index of correct answer (0-3)
   explanation?: string; // Why the answer is correct
   points?: number; // Points for this question (default: 10)
 }

@@ -135,17 +135,19 @@ export const createLesson = async (opts: {
 export const updateLessonStatus = async (opts: {
   lessonId: string;
   status: LessonStatus;
+  title?: string;
   content?: LessonContent;
   description?: string;
   lessonType?: string;
   researchNotes?: string[];
   errorMessage?: string;
 }) => {
-  const { lessonId, status, content, description, lessonType, researchNotes, errorMessage } = opts;
+  const { lessonId, status, title, content, description, lessonType, researchNotes, errorMessage } = opts;
 
   const updateData: {
     status: LessonStatus;
     updatedAt: Date;
+    title?: string;
     content?: LessonContent;
     description?: string;
     lessonType?: string;
@@ -156,6 +158,7 @@ export const updateLessonStatus = async (opts: {
     updatedAt: new Date(),
   };
 
+  if (title !== undefined) updateData.title = title;
   if (content !== undefined) updateData.content = content;
   if (description !== undefined) updateData.description = description;
   if (lessonType !== undefined) updateData.lessonType = lessonType;

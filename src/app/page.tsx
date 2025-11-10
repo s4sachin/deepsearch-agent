@@ -33,8 +33,8 @@ export default async function HomePage() {
     <div className="min-h-screen bg-gray-950">
       <div className="max-w-6xl mx-auto px-4 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-2">
+        <div className="mb-8 text-center">
+          <div className="flex items-center justify-center gap-3 mb-2">
             <BookOpen className="h-8 w-8 text-blue-500" />
             <h1 className="text-3xl font-bold text-gray-100">
               Lesson Generator

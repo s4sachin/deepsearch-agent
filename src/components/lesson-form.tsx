@@ -35,16 +35,33 @@ export const LessonForm = () => {
       }
 
       const data = await response.json();
-
-      // Clear form
+      
+      // Clear form immediately since generation is happening in background
       setOutline("");
+      setIsGenerating(false);
 
-      // Navigate to the lesson page
-      router.push(`/lessons/${data.lesson.id}`);
-      router.refresh(); // Refresh to update the lessons table
+      // Refresh to show the new "generating" lesson in the table
+      router.refresh();
+      
+      // Poll for updates every 3 seconds for up to 2 minutes
+      const lessonId = data.lesson.id;
+      let pollCount = 0;
+      const maxPolls = 40; // 40 * 3s = 2 minutes
+      
+      const checkStatus = setInterval(async () => {
+        pollCount++;
+        
+        // Refresh the page to update the table
+        router.refresh();
+        
+        // Stop polling after max attempts
+        if (pollCount >= maxPolls) {
+          clearInterval(checkStatus);
+        }
+      }, 3000); // Poll every 3 seconds
+      
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
-    } finally {
       setIsGenerating(false);
     }
   };
