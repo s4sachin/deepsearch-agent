@@ -9,6 +9,21 @@ export const LessonForm = () => {
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
 
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    // Submit on Cmd+Enter (Mac) or Ctrl+Enter (Windows/Linux)
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+      e.preventDefault();
+      handleSubmit(e as unknown as React.FormEvent);
+      return;
+    }
+    
+    // Submit on Enter (but allow Shift+Enter for new lines)
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSubmit(e as unknown as React.FormEvent);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -46,7 +61,7 @@ export const LessonForm = () => {
       // Poll for updates every 3 seconds for up to 2 minutes
       const lessonId = data.lesson.id;
       let pollCount = 0;
-      const maxPolls = 40; // 40 * 3s = 2 minutes
+      const maxPolls = 20; 
       
       const checkStatus = setInterval(async () => {
         pollCount++;
@@ -79,12 +94,13 @@ export const LessonForm = () => {
           id="outline"
           value={outline}
           onChange={(e) => setOutline(e.target.value)}
+          onKeyDown={handleKeyDown}
           placeholder='Enter your lesson description (e.g., "A 10 question pop quiz on Florida" or "A tutorial on how to divide with long division")'
           className="w-full h-32 px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
           disabled={isGenerating}
         />
         <p className="mt-1 text-xs text-gray-500">
-          Minimum 10 characters. Be specific about what you want to learn.
+          What would you like to explore and learn today? 
         </p>
       </div>
 
