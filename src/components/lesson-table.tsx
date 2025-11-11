@@ -50,12 +50,21 @@ const getLessonTypeIcon = (type: string | null) => {
 };
 
 const formatDate = (date: Date) => {
+  const d = new Date(date);
+  const day = d.getDate();
+  const month = d.toLocaleDateString("en-US", { month: "short" });
+  const year = d.getFullYear().toString().slice(-2);
+  return `${day} ${month}'${year}`;
+};
+
+const formatFullDateTime = (date: Date) => {
   return new Intl.DateTimeFormat("en-US", {
-    month: "short",
+    month: "long",
     day: "numeric",
     year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
+    second: "2-digit",
   }).format(new Date(date));
 };
 
@@ -82,13 +91,13 @@ export const LessonTable = ({ lessons }: LessonTableProps) => {
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
               Lesson
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+            <th className="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">
               Type
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+            <th className="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">
               Status
             </th>
-            <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider">
+            <th className="px-4 py-3 text-center text-xs font-medium text-gray-400 uppercase tracking-wider">
               Created
             </th>
           </tr>
@@ -132,11 +141,11 @@ export const LessonTable = ({ lessons }: LessonTableProps) => {
                   </div>
                 )}
               </td>
-              <td className="px-4 py-4">
+              <td className="px-4 py-4 text-center">
                 {lesson.lessonType ? (
-                  <div className="flex items-center gap-2 text-gray-400">
+                  <div className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-sm font-medium justify-center bg-blue-500/10 text-blue-400 border border-blue-500/20">
                     {getLessonTypeIcon(lesson.lessonType)}
-                    <span className="text-sm capitalize">
+                    <span className="capitalize">
                       {lesson.lessonType}
                     </span>
                   </div>
@@ -144,18 +153,29 @@ export const LessonTable = ({ lessons }: LessonTableProps) => {
                   <span className="text-sm text-gray-600">—</span>
                 )}
               </td>
-              <td className="px-4 py-4">
-                <div className="flex items-center gap-2">
+              <td className="px-4 py-4 text-center">
+                <div className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-sm font-medium justify-center ${
+                  lesson.status === 'generated' 
+                    ? 'bg-green-500/10 text-green-400 border border-green-500/20'
+                    : lesson.status === 'generating'
+                    ? 'bg-yellow-500/10 text-yellow-400 border border-yellow-500/20'
+                    : lesson.status === 'failed'
+                    ? 'bg-red-500/10 text-red-400 border border-red-500/20'
+                    : 'bg-gray-500/10 text-gray-400 border border-gray-500/20'
+                }`}>
                   {getStatusIcon(lesson.status)}
-                  <span className="text-sm text-gray-300">
+                  <span>
                     {getStatusText(lesson.status)}
                   </span>
                 </div>
               </td>
-              <td className="px-4 py-4">
-                <span className="text-sm text-gray-500">
+              <td className="px-4 py-4 text-center">
+                <div 
+                  className="inline-flex items-center px-2.5 py-1.5 rounded-full text-sm font-medium bg-gray-500/10 text-gray-400 border border-gray-500/20 cursor-help justify-center whitespace-nowrap"
+                  title={formatFullDateTime(lesson.createdAt)}
+                >
                   {formatDate(lesson.createdAt)}
-                </span>
+                </div>
               </td>
             </tr>
           ))}
