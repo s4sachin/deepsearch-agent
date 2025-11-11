@@ -62,14 +62,6 @@ export async function POST(request: Request) {
     userId: session.user.id,
   });
 
-  // Start generating title in parallel for new chats
-  let titlePromise: Promise<string> | null = null;
-  if (!chatId) {
-    titlePromise = generateChatTitle(messages, {
-      langfuseTraceId: trace.id,
-    });
-  }
-
   const stream = createUIMessageStream<OurMessage>({
     execute: async ({ writer }) => {
       // If this is a new chat, send the chat ID to the frontend
@@ -98,10 +90,24 @@ export async function POST(request: Request) {
       // Merge the existing messages with the response messages
       const entireConversation = [...messages, ...response.messages];
 
-      // Wait for title generation if it's in progress
+      // Generate title for new chats AFTER we have the complete conversation
+      // This ensures the AI has context from search/scrape results
       let generatedTitle: string | undefined;
-      if (titlePromise) {
-        generatedTitle = await titlePromise;
+      if (!chatId) {
+        try {
+          generatedTitle = await generateChatTitle(entireConversation, {
+            langfuseTraceId: trace.id,
+          });
+        } catch (error) {
+          console.error('Failed to generate chat title:', error);
+          // Fallback: use first few words of user message
+          const firstMessage = messages[0]?.parts?.[0];
+          if (firstMessage && 'text' in firstMessage) {
+            generatedTitle = firstMessage.text.slice(0, 50);
+          } else {
+            generatedTitle = 'Untitled Chat';
+          }
+        }
       }
 
       // Save the complete chat history
