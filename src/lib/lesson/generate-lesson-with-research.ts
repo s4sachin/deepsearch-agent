@@ -17,10 +17,10 @@ type StructuredContext = AgentContext;
  * Uses scraped content and search results in the generation prompt
  */
 export async function generateLessonWithResearch(
-  context: StructuredContext
+  context: StructuredContext,
 ): Promise<LessonContent> {
   const lessonType = context.getContentType();
-  
+
   if (!lessonType) {
     throw new Error("Lesson type must be determined before generation");
   }
@@ -78,8 +78,8 @@ function buildEnrichedGenerationPrompt(context: StructuredContext): string {
     }
     // Fallback: get from first user message
     const messages = context.getMessages();
-    const firstUserMessage = messages.find(m => m.role === 'user');
-    return firstUserMessage ? String(firstUserMessage) : 'No outline available';
+    const firstUserMessage = messages.find((m) => m.role === "user");
+    return firstUserMessage ? String(firstUserMessage) : "No outline available";
   };
 
   const getLessonType = () => {
@@ -257,10 +257,10 @@ function getTypeSpecificInstructions(lessonType: string): string {
  * Used when research fails or isn't needed
  */
 export async function generateLessonWithoutResearch(
-  context: StructuredContext
+  context: StructuredContext,
 ): Promise<LessonContent> {
   const lessonType = context.getContentType();
-  
+
   if (!lessonType) {
     throw new Error("Lesson type must be determined before generation");
   }
@@ -302,8 +302,8 @@ function buildBasicGenerationPrompt(context: StructuredContext): string {
     }
     // Fallback: get from first user message
     const messages = context.getMessages();
-    const firstUserMessage = messages.find(m => m.role === 'user');
-    return firstUserMessage ? String(firstUserMessage) : 'No outline available';
+    const firstUserMessage = messages.find((m) => m.role === "user");
+    return firstUserMessage ? String(firstUserMessage) : "No outline available";
   };
 
   const getLessonType = () => {
@@ -320,7 +320,7 @@ function buildBasicGenerationPrompt(context: StructuredContext): string {
   const outline = getOutline();
   const lessonType = getLessonType();
   const previousErrors = getPreviousErrors();
-  
+
   const typeInstructions = getTypeSpecificInstructions(lessonType!);
 
   let prompt = `You are an expert educational content creator with deep knowledge across many subjects. Create high-quality ${lessonType} content based on your training knowledge.
