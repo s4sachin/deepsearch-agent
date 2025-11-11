@@ -92,3 +92,22 @@ export const generateLesson = async (opts: {
   // Return context immediately for status tracking
   return context;
 };
+
+/**
+ * Generate a lesson and wait for completion (for evaluation/testing)
+ * Similar to askDeepSearch but for structured content generation
+ */
+export async function askGenerateLesson(outline: string): Promise<LessonContent> {
+  return new Promise((resolve, reject) => {
+    generateLesson({
+      outline,
+      langfuseTraceId: undefined,
+      onFinish: (result) => {
+        resolve(result);
+      },
+      onError: (error) => {
+        reject(error);
+      },
+    }).catch(reject);
+  });
+}
