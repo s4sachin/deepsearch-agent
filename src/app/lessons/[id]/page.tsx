@@ -33,7 +33,7 @@ export default async function LessonPage({
       <div className="min-h-screen bg-gray-950">
         <div className="max-w-4xl mx-auto px-4 py-8">
           <Link
-            href="/"
+            href="/lessons"
             className="inline-flex items-center gap-2 text-gray-400 hover:text-gray-300 mb-8 transition-colors"
           >
             <ArrowLeft className="h-4 w-4" />
@@ -82,7 +82,7 @@ export default async function LessonPage({
       <div className="max-w-4xl mx-auto px-4 py-8">
         {/* Back button */}
         <Link
-          href="/"
+          href="/lessons"
           className="inline-flex items-center gap-2 text-gray-400 hover:text-gray-300 mb-8 transition-colors"
         >
           <ArrowLeft className="h-4 w-4" />
