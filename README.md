@@ -36,6 +36,20 @@ Content moderation, clarification system, validation-driven refinement, error re
 **📊 Infrastructure**  
 Supabase PostgreSQL, Redis caching, Langfuse telemetry, NextAuth (Discord), rate limiting.
 
+## 📸 Screenshots
+
+### Landing Page
+![Landing Page](/screenshots/landing-page.png)
+*Elegant dual-mode interface with Chat Agent and Lesson Generator options*
+
+### Chat Agent
+![Chat Agent](/screenshots/chat-agent.png)
+*Real-time conversational AI with web research, citations, and reasoning steps*
+
+### Lesson Generator
+![Lesson Generator](/screenshots/lesson-generator.png)
+*Create interactive quizzes, tutorials, and flashcards with AI-powered research*
+
 ## 🏗️ Architecture
 
 **Tech Stack**

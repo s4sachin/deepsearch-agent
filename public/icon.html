@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { margin: 0; padding: 20px; background: #111; }
+        canvas { border: 1px solid #333; }
+    </style>
+</head>
+<body>
+    <canvas id="canvas" width="32" height="32"></canvas>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Background
+        ctx.fillStyle = '#1F2937';
+        ctx.fillRect(0, 0, 32, 32);
+        
+        // Magnifying glass circle
+        ctx.strokeStyle = '#60A5FA';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(14, 14, 6, 0, Math.PI * 2);
+        ctx.stroke();
+        
+        // Magnifying glass handle
+        ctx.beginPath();
+        ctx.moveTo(18.5, 18.5);
+        ctx.lineTo(24, 24);
+        ctx.stroke();
+        
+        // Center sparkle
+        ctx.fillStyle = '#A78BFA';
+        ctx.beginPath();
+        ctx.arc(14, 14, 2, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Download link
+        const link = document.createElement('a');
+        link.download = 'icon.png';
+        link.href = canvas.toDataURL();
+        link.textContent = 'Download icon.png';
+        link.style.color = '#60A5FA';
+        document.body.appendChild(link);
+    </script>
+</body>
+</html>
