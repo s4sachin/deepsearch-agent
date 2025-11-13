@@ -1,0 +1,47 @@
+# Development files
+*.local
+.env
+.env.local
+.env*.local
+
+# Testing
+coverage
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+__tests__
+evals/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Build artifacts
+.next
+.turbo
+dist
+build
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Development tools
+.vscode
+.idea
+
+# Database
+drizzle/
+*.sql
+
+# Scripts
+scripts/
+start-redis.sh
+
+# Evaluation tools
+evalite.config.ts
+vitest.config.ts
